@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aras Innovator R36 - Multi-Label Form Field 模擬測試展示</title>
+  <link rel="stylesheet" href="../../src/styles/label-widget.css" />
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #F3F4F6;
+      margin: 0;
+      padding: 30px 20px;
+      color: #1F2937;
+    }
+    .aras-window {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      border: 1px solid #E5E7EB;
+    }
+    .aras-header {
+      background: #1E293B;
+      color: #FFFFFF;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .aras-header h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .aras-status-pill {
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: #10B981;
+      color: #FFFFFF;
+    }
+    .aras-toolbar {
+      background: #F9FAFB;
+      border-bottom: 1px solid #E5E7EB;
+      padding: 10px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .aras-btn {
+      padding: 6px 14px;
+      font-size: 13px;
+      border-radius: 5px;
+      border: 1px solid #D1D5DB;
+      background: #FFFFFF;
+      cursor: pointer;
+      color: #374151;
+      transition: all 0.15s;
+    }
+    .aras-btn:hover {
+      background: #F3F4F6;
+      border-color: #9CA3AF;
+    }
+    .aras-btn.primary {
+      background: #3B82F6;
+      color: #FFFFFF;
+      border-color: #2563EB;
+    }
+    .aras-btn.primary:hover {
+      background: #2563EB;
+    }
+    .aras-form-body {
+      padding: 24px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 18px 16px;
+      align-items: start;
+    }
+    .field-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #4B5563;
+      padding-top: 8px;
+    }
+    .field-control input[type="text"] {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 13px;
+      border: 1px solid #D1D5DB;
+      border-radius: 6px;
+      box-sizing: border-box;
+      background: #F9FAFB;
+    }
+    .preview-box {
+      margin-top: 24px;
+      background: #0F172A;
+      color: #38BDF8;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .preview-title {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-bottom: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="aras-window">
+    <!-- 表單標題 -->
+    <div class="aras-header">
+      <h1>
+        <span>Aras Innovator R36 - Part Form: [PR-2026-0098]</span>
+        <span class="aras-status-pill" id="modeIndicator">Edit Mode (Locked)</span>
+      </h1>
+      <span style="font-size: 12px; color: #94A3B8;">User: admin</span>
+    </div>
+
+    <!-- 模擬工具列 -->
+    <div class="aras-toolbar">
+      <button class="aras-btn primary" id="btnToggleMode">切換為 唯讀模式 (View Mode)</button>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 12px; color: #6B7280;">切換 Session 語系：</span>
+        <button class="aras-btn" id="btnLangZhTW">繁體中文 (zh-TW)</button>
+        <button class="aras-btn" id="btnLangEn">English (en)</button>
+        <button class="aras-btn" id="btnLangZhCN">简体中文 (zh-CN)</button>
+      </div>
+    </div>
+
+    <!-- 表單主體 -->
+    <div class="aras-form-body">
+      <div class="form-grid">
+        <div class="field-label">品號 (item_number)</div>
+        <div class="field-control">
+          <input type="text" value="PR-2026-0098" readonly />
+        </div>
+
+        <div class="field-label">名稱 (name)</div>
+        <div class="field-control">
+          <input type="text" value="精密伺服馬達模組 (Precision Servo Motor)" readonly />
+        </div>
+
+        <div class="field-label">多筆標籤 (labels)</div>
+        <div class="field-control">
+          <!-- 這是我們的自訂 Client Form Field 掛載點 -->
+          <div id="labelFieldMountPoint"></div>
+        </div>
+      </div>
+
+      <!-- 即時屬性儲存監視器 -->
+      <div class="preview-title" style="margin-top: 30px;">Aras Item Property「labels」即時寫入之 JSON 資料：</div>
+      <div class="preview-box" id="jsonMonitor">[]</div>
+    </div>
+  </div>
+
+  <!-- 載入模組 -->
+  <script src="../../src/models/LabelTag.js"></script>
+  <script src="../../src/core/LabelStore.js"></script>
+  <script src="../../src/core/LabelRenderer.js"></script>
+  <script src="../../src/adapter/IArasAdapter.js"></script>
+  <script src="../../src/adapter/MockArasAdapter.js"></script>
+  <script src="../../src/controller/MultiLabelController.js"></script>
+
+  <script>
+    // 初始化模擬環境
+    const mockAdapter = new MockArasAdapter({
+      currentLanguage: "zh-TW",
+      editMode: true,
+      onPropertyChangeCallback: (prop, val) => {
+        updateMonitor(val);
+      }
+    });
+
+    // 預先寫入預設標籤資料
+    const defaultData = JSON.stringify([
+      {
+        name: "urgent",
+        label: "緊急處理",
+        labels: { "zh-TW": "緊急處理", "zh-CN": "紧急处理", "en": "Urgent Action" },
+        color: "#EF4444",
+        sort_id: 10
+      },
+      {
+        name: "design",
+        label: "設計階段",
+        labels: { "zh-TW": "設計階段", "zh-CN": "设计阶段", "en": "Design Stage" },
+        color: "#3B82F6",
+        sort_id: 30
+      }
+    ]);
+    mockAdapter.setPropertyValue("labels", defaultData);
+
+    const controller = new MultiLabelController({
+      container: "labelFieldMountPoint",
+      propertyName: "labels",
+      labelCategoryName: "Part_Labels",
+      adapter: mockAdapter
+    });
+
+    controller.init().then(() => {
+      updateMonitor(mockAdapter.getPropertyValue("labels"));
+    });
+
+    function updateMonitor(val) {
+      const el = document.getElementById("jsonMonitor");
+      try {
+        const obj = JSON.parse(val || "[]");
+        el.textContent = JSON.stringify(obj, null, 2);
+      } catch (e) {
+        el.textContent = val;
+      }
+    }
+
+    // 模式切換按鈕
+    const btnToggleMode = document.getElementById("btnToggleMode");
+    const modeIndicator = document.getElementById("modeIndicator");
+    btnToggleMode.addEventListener("click", () => {
+      const current = mockAdapter.isEditMode();
+      const next = !current;
+      mockAdapter.setEditMode(next);
+      controller.setEditMode(next);
+
+      if (next) {
+        btnToggleMode.textContent = "切換為 唯讀模式 (View Mode)";
+        modeIndicator.textContent = "Edit Mode (Locked)";
+        modeIndicator.style.background = "#10B981";
+      } else {
+        btnToggleMode.textContent = "切換為 編輯模式 (Edit Mode)";
+        modeIndicator.textContent = "View Mode (Read-Only)";
+        modeIndicator.style.background = "#6B7280";
+      }
+    });
+
+    // 語系切換按鈕
+    document.getElementById("btnLangZhTW").addEventListener("click", () => {
+      mockAdapter.setLanguage("zh-TW");
+      controller.changeLanguage("zh-TW");
+    });
+    document.getElementById("btnLangEn").addEventListener("click", () => {
+      mockAdapter.setLanguage("en");
+      controller.changeLanguage("en");
+    });
+    document.getElementById("btnLangZhCN").addEventListener("click", () => {
+      mockAdapter.setLanguage("zh-CN");
+      controller.changeLanguage("zh-CN");
+    });
+  </script>
+</body>
+</html>

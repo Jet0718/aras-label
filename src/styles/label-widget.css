@@ -1,0 +1,231 @@
+/**
+ * @file label-widget.css
+ * @description Aras Innovator R36 多標籤 Form Field 視覺風格樣式表
+ * 具備色彩徽章、流暢微動效、聚焦外框、下拉候選搜尋面板與唯讀防護。
+ */
+
+/* 根容器與變數設定 */
+:root {
+  --bcs-tag-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bcs-tag-bg: #FFFFFF;
+  --bcs-tag-border: #D1D5DB;
+  --bcs-tag-border-focus: #3B82F6;
+  --bcs-tag-shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  --bcs-tag-text-muted: #6B7280;
+  --bcs-tag-dropdown-bg: #FFFFFF;
+  --bcs-tag-dropdown-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --bcs-tag-radius: 6px;
+  --bcs-tag-transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 主容器 */
+.bcs-multi-label-container {
+  position: relative;
+  font-family: var(--bcs-tag-font-family);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 標籤輸入包裝外框 */
+.bcs-tag-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  min-height: 40px;
+  background-color: var(--bcs-tag-bg);
+  border: 1px solid var(--bcs-tag-border);
+  border-radius: var(--bcs-tag-radius);
+  transition: var(--bcs-tag-transition);
+  cursor: text;
+  box-sizing: border-box;
+}
+
+.bcs-tag-wrapper:hover {
+  border-color: #9CA3AF;
+}
+
+.bcs-tag-wrapper.is-focused {
+  border-color: var(--bcs-tag-border-focus);
+  box-shadow: var(--bcs-tag-shadow-focus);
+}
+
+/* 唯讀狀態外框 */
+.bcs-tag-wrapper.is-readonly {
+  background-color: #F9FAFB;
+  border-color: #E5E7EB;
+  cursor: default;
+}
+
+.bcs-tag-wrapper.is-readonly:hover {
+  border-color: #E5E7EB;
+}
+
+/* 標籤徽章 (Chip / Badge) */
+.bcs-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: var(--bcs-tag-transition);
+  user-select: none;
+  animation: bcsTagPopIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.bcs-tag-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.12);
+}
+
+/* 標籤刪除按鈕 (x) */
+.bcs-tag-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  transition: var(--bcs-tag-transition);
+}
+
+.bcs-tag-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* 搜尋/輸入框 */
+.bcs-tag-input {
+  flex: 1 1 120px;
+  min-width: 80px;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  padding: 4px 6px;
+  background: transparent;
+  color: #1F2937;
+  font-family: inherit;
+}
+
+.bcs-tag-input::placeholder {
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+/* 候選下拉面板 */
+.bcs-tag-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: var(--bcs-tag-dropdown-bg);
+  border: 1px solid #E5E7EB;
+  border-radius: var(--bcs-tag-radius);
+  box-shadow: var(--bcs-tag-dropdown-shadow);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  display: none;
+  animation: bcsDropdownSlide 0.18s ease-out;
+}
+
+.bcs-tag-dropdown.is-open {
+  display: block;
+}
+
+/* 下拉候選項 */
+.bcs-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: var(--bcs-tag-transition);
+}
+
+.bcs-dropdown-item:hover,
+.bcs-dropdown-item.is-highlighted {
+  background-color: #F3F4F6;
+  color: #111827;
+}
+
+/* 下拉項目的色彩預覽圓點 */
+.bcs-dropdown-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.bcs-dropdown-left {
+  display: flex;
+  align-items: center;
+}
+
+.bcs-dropdown-subtext {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-left: 6px;
+}
+
+/* 空搜尋結果提示 */
+.bcs-dropdown-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+/* 動畫定義 */
+@keyframes bcsTagPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bcsDropdownSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 重複標籤警示晃動動畫 */
+@keyframes bcsTagShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.bcs-tag-shake {
+  animation: bcsTagShake 0.4s ease-in-out;
+}

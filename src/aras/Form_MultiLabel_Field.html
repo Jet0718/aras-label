@@ -1,0 +1,470 @@
+<!-- Aras Innovator R36 - Client Form Multi-Label Field 元件容器 -->
+<div id="bcs_label_container" style="width: 100%; min-width: 260px;"></div>
+
+<style>
+/* 標籤元件視覺樣式 (支援 Aras R36 現代化扁平介面) */
+:root {
+  --bcs-tag-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bcs-tag-border: #D1D5DB;
+  --bcs-tag-focus-border: #3B82F6;
+  --bcs-tag-focus-ring: rgba(59, 130, 246, 0.2);
+}
+
+.bcs-multi-label-container {
+  position: relative;
+  font-family: var(--bcs-tag-font);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bcs-tag-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  min-height: 38px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--bcs-tag-border);
+  border-radius: 6px;
+  transition: all 0.18s ease;
+  cursor: text;
+  box-sizing: border-box;
+}
+
+.bcs-tag-wrapper:hover {
+  border-color: #9CA3AF;
+}
+
+.bcs-tag-wrapper.is-focused {
+  border-color: var(--bcs-tag-focus-border);
+  box-shadow: 0 0 0 3px var(--bcs-tag-focus-ring);
+}
+
+.bcs-tag-wrapper.is-readonly {
+  background-color: #F9FAFB;
+  border-color: #E5E7EB;
+  cursor: default;
+}
+
+.bcs-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  user-select: none;
+  animation: bcsPopIn 0.18s ease-out;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bcs-tag-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+}
+
+.bcs-tag-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.bcs-tag-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.bcs-tag-input {
+  flex: 1 1 120px;
+  min-width: 80px;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  padding: 4px 6px;
+  background: transparent;
+  color: #1F2937;
+  font-family: inherit;
+}
+
+.bcs-tag-input::placeholder {
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+.bcs-tag-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  display: none;
+}
+
+.bcs-tag-dropdown.is-open {
+  display: block;
+}
+
+.bcs-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.bcs-dropdown-item:hover,
+.bcs-dropdown-item.is-highlighted {
+  background-color: #F3F4F6;
+  color: #111827;
+}
+
+.bcs-dropdown-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.bcs-dropdown-subtext {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-left: 6px;
+}
+
+.bcs-dropdown-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+@keyframes bcsPopIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bcsShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.bcs-tag-shake {
+  animation: bcsShake 0.35s ease-in-out;
+}
+</style>
+
+<script>
+/**
+ * Aras Innovator R36 Multi-Label Client Field Runtime
+ */
+(function(window) {
+  // 1. LabelTag 類別
+  class LabelTag {
+    constructor(name, label, color = "#3B82F6", sort_id = 0, labels = {}) {
+      this.name = (name || "").trim();
+      this.label = (label || this.name).trim();
+      this.color = LabelTag.normalizeColor(color);
+      this.sort_id = parseFloat(sort_id) || 0;
+      this.labels = labels && typeof labels === "object" ? { ...labels } : {};
+      if (!this.labels["default"] && this.label) {
+        this.labels["default"] = this.label;
+      }
+    }
+
+    static normalizeColor(rawColor) {
+      if (!rawColor || typeof rawColor !== "string") return "#3B82F6";
+      const clean = rawColor.trim();
+      const hexRegex = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/;
+      if (hexRegex.test(clean)) {
+        if (clean.length === 4) {
+          return `#${clean[1]}${clean[1]}${clean[2]}${clean[2]}${clean[3]}${clean[3]}`.toUpperCase();
+        }
+        return clean.toUpperCase();
+      }
+      return "#3B82F6";
+    }
+
+    getDisplayLabel(langCode = "zh-TW") {
+      if (this.labels && typeof this.labels === "object") {
+        if (this.labels[langCode]) return this.labels[langCode];
+        const baseLang = langCode.split("-")[0];
+        if (this.labels[baseLang]) return this.labels[baseLang];
+        if (this.labels["en"]) return this.labels["en"];
+        if (this.labels["default"]) return this.labels["default"];
+      }
+      return this.label || this.name;
+    }
+
+    getContrastTextColor() {
+      const hex = this.color.replace("#", "");
+      const r = parseInt(hex.substring(0, 2), 16) || 0;
+      const g = parseInt(hex.substring(2, 4), 16) || 0;
+      const b = parseInt(hex.substring(4, 6), 16) || 0;
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 150 ? "#1F2937" : "#FFFFFF";
+    }
+
+    toJSON() {
+      return {
+        name: this.name,
+        label: this.label,
+        labels: this.labels,
+        color: this.color,
+        sort_id: this.sort_id
+      };
+    }
+
+    static fromJSON(obj) {
+      return new LabelTag(obj.name, obj.label, obj.color, obj.sort_id, obj.labels);
+    }
+  }
+
+  // 2. LabelStore 類別
+  class LabelStore {
+    constructor() {
+      this.tags = [];
+    }
+
+    has(name) {
+      const target = (name || "").trim().toLowerCase();
+      return this.tags.some((t) => t.name.toLowerCase() === target);
+    }
+
+    add(tag) {
+      if (!tag || this.has(tag.name)) return false;
+      this.tags.push(tag);
+      this.tags.sort((a, b) => a.sort_id - b.sort_id);
+      return true;
+    }
+
+    removeByName(name) {
+      const target = (name || "").trim().toLowerCase();
+      const initialLen = this.tags.length;
+      this.tags = this.tags.filter((t) => t.name.toLowerCase() !== target);
+      return this.tags.length < initialLen;
+    }
+
+    getAll() {
+      return [...this.tags];
+    }
+
+    serializeJSON() {
+      return JSON.stringify(this.tags.map((t) => t.toJSON()));
+    }
+
+    deserializeJSON(jsonString) {
+      this.tags = [];
+      if (!jsonString || typeof jsonString !== "string") return;
+      try {
+        const arr = JSON.parse(jsonString.trim());
+        if (Array.isArray(arr)) {
+          arr.forEach((it) => {
+            if (it && it.name) this.add(LabelTag.fromJSON(it));
+          });
+        }
+      } catch (e) {
+        console.warn("LabelStore 解析失敗：", e);
+      }
+    }
+  }
+
+  // 3. 全域初始化工廠函式
+  window.initBcsMultiLabelField = async function(config) {
+    const container = document.getElementById(config.containerId);
+    if (!container) return;
+
+    const propertyName = config.propertyName || "labels";
+    const categoryName = config.labelCategoryName || "Part_Labels";
+
+    // 建立 Aras 原生適配層
+    const currentLang = (window.aras && window.aras.getSessionContext) 
+      ? window.aras.getSessionContext().getLanguageCode() 
+      : "zh-TW";
+
+    const isEditMode = (window.document && typeof window.document.isEditMode !== "undefined")
+      ? Boolean(window.document.isEditMode)
+      : true;
+
+    // 取得現有資料
+    let rawJSON = "";
+    if (window.document && window.document.item) {
+      rawJSON = window.document.item.getProperty ? window.document.item.getProperty(propertyName) : "";
+    }
+
+    const store = new LabelStore();
+    store.deserializeJSON(rawJSON);
+
+    // 查詢 bcs_label 及其關聯的 bcs_label_tags
+    let availableTags = [];
+    if (window.aras && typeof window.aras.newIOMItem === "function") {
+      try {
+        const q = window.aras.newIOMItem("bcs_label", "get");
+        q.setAttribute("select", "name");
+        q.setProperty("name", categoryName);
+        const rel = window.aras.newIOMItem("bcs_label_tags", "get");
+        rel.setAttribute("select", "sort_id,name,label,color");
+        rel.setAttribute("orderBy", "sort_id");
+        q.addRelationship(rel);
+        const res = q.apply();
+        if (!res.isError()) {
+          const rels = res.getRelationships("bcs_label_tags");
+          for (let i = 0; i < rels.getItemCount(); i++) {
+            const it = rels.getItemByIndex(i);
+            const n = it.getProperty("name");
+            const l = it.getProperty("label") || n;
+            const c = it.getProperty("color") || "#3B82F6";
+            const s = parseFloat(it.getProperty("sort_id")) || 0;
+            availableTags.push(new LabelTag(n, l, c, s, { [currentLang]: l, default: l }));
+          }
+        }
+      } catch (err) {
+        console.warn("載入 bcs_label 標籤清單異常：", err);
+      }
+    }
+
+    // 繪製 UI
+    container.classList.add("bcs-multi-label-container");
+    container.innerHTML = `
+      <div class="bcs-tag-wrapper ${!isEditMode ? 'is-readonly' : ''}" id="bcsTagWrapper">
+        <div class="bcs-tag-list" id="bcsTagList" style="display:contents;"></div>
+        <input type="text" class="bcs-tag-input" id="bcsTagInput" placeholder="搜尋或添加標籤..." autocomplete="off" style="${!isEditMode ? 'display:none;' : ''}" />
+      </div>
+      <div class="bcs-tag-dropdown" id="bcsTagDropdown"></div>
+    `;
+
+    const wrapper = container.querySelector("#bcsTagWrapper");
+    const tagList = container.querySelector("#bcsTagList");
+    const input = container.querySelector("#bcsTagInput");
+    const dropdown = container.querySelector("#bcsTagDropdown");
+
+    function renderBadges() {
+      tagList.innerHTML = "";
+      store.getAll().forEach((tag) => {
+        const badge = document.createElement("span");
+        badge.className = "bcs-tag-badge";
+        badge.dataset.name = tag.name;
+        badge.style.backgroundColor = tag.color;
+        badge.style.color = tag.getContrastTextColor();
+        badge.innerHTML = `<span>${tag.getDisplayLabel(currentLang)}</span>`;
+
+        if (isEditMode) {
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "bcs-tag-remove-btn";
+          removeBtn.innerHTML = "&times;";
+          removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            store.removeByName(tag.name);
+            syncValue();
+            renderBadges();
+          };
+          badge.appendChild(removeBtn);
+        }
+        tagList.appendChild(badge);
+      });
+    }
+
+    function syncValue() {
+      const jsonStr = store.serializeJSON();
+      if (typeof window.handleItemChange === "function") {
+        window.handleItemChange(propertyName, jsonStr);
+      } else if (window.aras && window.document.item) {
+        window.aras.setItemProperty(window.document.item, propertyName, jsonStr);
+      }
+    }
+
+    function renderDropdown(filterQuery) {
+      if (!isEditMode) return;
+      const q = (filterQuery || "").toLowerCase();
+      const filtered = availableTags.filter((t) => {
+        if (store.has(t.name)) return false;
+        if (!q) return true;
+        return t.name.toLowerCase().includes(q) || t.getDisplayLabel(currentLang).toLowerCase().includes(q);
+      });
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div class="bcs-dropdown-empty">無匹配的標籤</div>';
+      } else {
+        dropdown.innerHTML = "";
+        filtered.forEach((tag) => {
+          const item = document.createElement("div");
+          item.className = "bcs-dropdown-item";
+          item.innerHTML = `
+            <div>
+              <span class="bcs-dropdown-color-dot" style="background-color: ${tag.color};"></span>
+              <strong>${tag.getDisplayLabel(currentLang)}</strong>
+              <span class="bcs-dropdown-subtext">${tag.name}</span>
+            </div>
+          `;
+          item.onmousedown = (e) => {
+            e.preventDefault();
+            store.add(tag);
+            syncValue();
+            renderBadges();
+            input.value = "";
+            dropdown.classList.remove("is-open");
+          };
+          dropdown.appendChild(item);
+        });
+      }
+      dropdown.classList.add("is-open");
+    }
+
+    if (isEditMode) {
+      input.onfocus = () => {
+        wrapper.classList.add("is-focused");
+        renderDropdown(input.value.trim());
+      };
+      input.onblur = () => {
+        wrapper.classList.remove("is-focused");
+        setTimeout(() => dropdown.classList.remove("is-open"), 180);
+      };
+      input.oninput = (e) => renderDropdown(e.target.value.trim());
+      input.onkeydown = (e) => {
+        if (e.key === "Backspace" && !input.value) {
+          const tags = store.getAll();
+          if (tags.length > 0) {
+            store.removeByName(tags[tags.length - 1].name);
+            syncValue();
+            renderBadges();
+          }
+        } else if (e.key === "Escape") {
+          dropdown.classList.remove("is-open");
+        }
+      };
+    }
+
+    renderBadges();
+  };
+})(window);
+</script>

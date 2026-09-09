@@ -1,0 +1,146 @@
+<AML>
+  <!-- 1. 建立標籤分類目錄主表 ItemType: bcs_label -->
+  <Item type="ItemType" id="BCS_LABEL_ITEMTYPE_001" action="add">
+    <name>bcs_label</name>
+    <label xml:lang="zh-TW">標籤目錄</label>
+    <label xml:lang="en">Label Categories</label>
+    <is_relationship>0</is_relationship>
+    <is_versionable>0</is_versionable>
+    <use_src_access>0</use_src_access>
+    <auto_search>1</auto_search>
+    
+    <!-- 屬性定義: name -->
+    <Relationships>
+      <Item type="Property" id="BCS_LABEL_PROP_NAME" action="add">
+        <name>name</name>
+        <label xml:lang="zh-TW">目錄名稱</label>
+        <label xml:lang="en">Category Name</label>
+        <data_type>string</data_type>
+        <stored_length>64</stored_length>
+        <is_required>1</is_required>
+        <is_keyed>1</is_keyed>
+      </Item>
+      <Item type="Property" id="BCS_LABEL_PROP_DESC" action="add">
+        <name>description</name>
+        <label xml:lang="zh-TW">目錄說明</label>
+        <label xml:lang="en">Description</label>
+        <data_type>string</data_type>
+        <stored_length>128</stored_length>
+      </Item>
+    </Relationships>
+  </Item>
+
+  <!-- 2. 建立關聯標籤細項 ItemType / RelationshipType: bcs_label_tags -->
+  <Item type="ItemType" id="BCS_LABEL_TAGS_ITEMTYPE_002" action="add">
+    <name>bcs_label_tags</name>
+    <label xml:lang="zh-TW">標籤項目清單</label>
+    <label xml:lang="en">Label Tags</label>
+    <is_relationship>1</is_relationship>
+    <is_versionable>0</is_versionable>
+    
+    <Relationships>
+      <!-- 排序序號 sort_id (float) -->
+      <Item type="Property" id="BCS_TAG_PROP_SORT" action="add">
+        <name>sort_id</name>
+        <label xml:lang="zh-TW">排序序號</label>
+        <label xml:lang="en">Sort Order</label>
+        <data_type>float</data_type>
+      </Item>
+
+      <!-- 標籤唯一代碼 name (string: 32) -->
+      <Item type="Property" id="BCS_TAG_PROP_NAME" action="add">
+        <name>name</name>
+        <label xml:lang="zh-TW">標籤代碼</label>
+        <label xml:lang="en">Tag Key</label>
+        <data_type>string</data_type>
+        <stored_length>32</stored_length>
+        <is_required>1</is_required>
+      </Item>
+
+      <!-- 多語系標籤文字 label (ml_string: 64) -->
+      <Item type="Property" id="BCS_TAG_PROP_LABEL" action="add">
+        <name>label</name>
+        <label xml:lang="zh-TW">標籤顯示名稱</label>
+        <label xml:lang="en">Tag Label</label>
+        <data_type>ml_string</data_type>
+        <stored_length>64</stored_length>
+        <is_required>1</is_required>
+      </Item>
+
+      <!-- 色彩代碼 color (color: 32 / string) -->
+      <Item type="Property" id="BCS_TAG_PROP_COLOR" action="add">
+        <name>color</name>
+        <label xml:lang="zh-TW">標籤顏色</label>
+        <label xml:lang="en">Badge Color</label>
+        <data_type>color</data_type>
+        <stored_length>32</stored_length>
+      </Item>
+    </Relationships>
+  </Item>
+
+  <!-- 3. 建立 RelationshipType 連結 bcs_label 與 bcs_label_tags -->
+  <Item type="RelationshipType" id="BCS_REL_TYPE_001" action="add">
+    <name>bcs_label_tags</name>
+    <label xml:lang="zh-TW">標籤項目</label>
+    <label xml:lang="en">Tags</label>
+    <source_id>
+      <Item type="ItemType" action="get" select="id">
+        <name>bcs_label</name>
+      </Item>
+    </source_id>
+    <relationship_id>
+      <Item type="ItemType" action="get" select="id">
+        <name>bcs_label_tags</name>
+      </Item>
+    </relationship_id>
+    <auto_search>1</auto_search>
+  </Item>
+
+  <!-- 4. 建立範例標籤目錄與彩色標籤項目 (Part_Labels) -->
+  <Item type="bcs_label" id="BCS_LABEL_SAMPLE_PART" action="add">
+    <name>Part_Labels</name>
+    <description>零件專用彩色標籤群組</description>
+    <Relationships>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>10</sort_id>
+        <name>urgent</name>
+        <label xml:lang="zh-TW">緊急處理</label>
+        <label xml:lang="zh-CN">紧急处理</label>
+        <label xml:lang="en">Urgent Action</label>
+        <color>#EF4444</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>20</sort_id>
+        <name>vip</name>
+        <label xml:lang="zh-TW">VIP重點</label>
+        <label xml:lang="zh-CN">VIP重点</label>
+        <label xml:lang="en">VIP Focus</label>
+        <color>#8B5CF6</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>30</sort_id>
+        <name>design</name>
+        <label xml:lang="zh-TW">設計審查</label>
+        <label xml:lang="zh-CN">设计审查</label>
+        <label xml:lang="en">Design Review</label>
+        <color>#3B82F6</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>40</sort_id>
+        <name>qualified</name>
+        <label xml:lang="zh-TW">合格量產</label>
+        <label xml:lang="zh-CN">合格量产</label>
+        <label xml:lang="en">Qualified</label>
+        <color>#10B981</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>50</sort_id>
+        <name>obsolete</name>
+        <label xml:lang="zh-TW">停產廢止</label>
+        <label xml:lang="zh-CN">停产废止</label>
+        <label xml:lang="en">Obsolete</label>
+        <color>#6B7280</color>
+      </Item>
+    </Relationships>
+  </Item>
+</AML>

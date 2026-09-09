@@ -1,0 +1,256 @@
+# Aras Innovator R36 - Client Form Multi-Label Field (`bcs_label`) 技術規格文件 (spec.md)
+
+## 1. 需求與背景概述
+
+### 1.1 需求說明
+在 **Aras Innovator R36** 的 ItemType 中，使用者希望將標準的文字屬性（Text 或 String Property，例如 `labels` 或 `tags`）在 Client 端表單（Form）上擴充為「可選擇多筆標籤（Multi-Label / Tag Chips）」的視覺與互動元件。
+標籤具備自訂顏色、多語系顯示與序號排序，並以新定義的 ItemType **`bcs_label`** 與關聯表 **`bcs_label_tags`** 作為標籤來源目錄。
+**重要擴充**：標籤維護與表單顯示必須完整支援 **Aras 多語系能力 (Multilingual / I18N)**，能夠根據當前使用者登入的 Session 語系（例如 `zh-TW`, `zh-CN`, `en`, `ja`）動態呈現對應的標籤名稱，並在無該語系設定時安全退回（Fallback）。
+
+### 1.2 標籤來源模型 (`bcs_label`)
+1. **主表 (ItemType: `bcs_label`)**：
+   - `name`: String(64) - 標籤分類目錄名稱（如 `Part_Labels`, `Project_Status`）。
+2. **關聯細項 (Relationship ItemType: `bcs_label_tags`)**：
+   - `sort_id`: Float - 排序序號。
+   - `name`: String(32) - 標籤鍵值代碼（Key/ID，不隨語系變動）。
+   - `label`: Multilingual String(64) - 支援多語系定義（`ml_string`）。在資料庫與 Client 端依登入語系提供不同語言文字。
+   - `color`: Color/String(32) - 標籤徽章背景色（如 `#EF4444`, `#3B82F6`）。
+
+### 1.3 資料儲存格式 (JSON 陣列字串，支援多語系結構)
+在目標 ItemType 的文字屬性欄位中，儲存格式為標準 JSON 陣列字串。
+為了使不同語言的使用者在開啟同一筆資料時皆能看見自己語系的標籤名稱，標籤資料封裝了 `labels` 多語系字典及預設 `label`：
+```json
+[
+  {
+    "name": "urgent",
+    "label": "緊急處理",
+    "labels": {
+      "zh-TW": "緊急處理",
+      "zh-CN": "紧急处理",
+      "en": "Urgent Action"
+    },
+    "color": "#EF4444",
+    "sort_id": 1.0
+  },
+  {
+    "name": "design",
+    "label": "設計中",
+    "labels": {
+      "zh-TW": "設計中",
+      "zh-CN": "设计中",
+      "en": "In Design"
+    },
+    "color": "#3B82F6",
+    "sort_id": 2.0
+  }
+]
+```
+
+---
+
+## 2. 系統架構與 S.O.L.I.D 設計
+
+- **Single Responsibility Principle (單一職責原則)**：
+  - `LabelTag`：實體模型，封裝單一標籤的色彩驗證、多語系解析 (`getDisplayLabel(langCode)`) 與 JSON 序列化。
+  - `LabelStore`：狀態管理，維護已選標籤陣列、重複檢查、新增/刪除與 JSON 序列化。
+  - `LabelRenderer`：負責 DOM 結構生成（Chips、色彩圓點、懸浮動態、搜尋下拉清單，顯示對應語系文字）。
+  - `ArasAdapter`：適配 Aras Innovator Client API，負責：
+    1. 取得當前使用者登入語系 (`aras.getSessionContext().getLanguageCode()`)。
+    2. 透過 IOM 查詢 `bcs_label` 及其關聯的 `bcs_label_tags`（包含各語系值）。
+    3. 透過 `handleItemChange` 寫入目標屬性。
+  - `MultiLabelController`：調度控制器，統籌上述模組之生命週期與多語系動態切換。
+- **Open/Closed Principle (開放封閉原則)**：
+  支援可抽換之 Adapter（正式環境的 `ArasAdapter` 與測試環境的 `MockArasAdapter`），亦可擴充新增其他語系代碼對應。
+- **Dependency Inversion Principle (依賴反向原則)**：
+  Controller 依賴於 Adapter 抽象介面，不直接繫結全域 DOM 或硬編碼特定語系代碼。
+
+---
+
+## 3. Mermaid 圖表集
+
+### 3.1 系統架構與多語系系統脈絡圖 (System Context)
+```mermaid
+flowchart TD
+    User["使用者 (Aras Web Client, 登入語系: zh-TW/en)"]
+    subgraph ArasClientPlatform["Aras Innovator R36 Web Client"]
+        Form["ItemType Form"]
+        Controller["MultiLabelController"]
+        Store["LabelStore (已選標籤資料)"]
+        Renderer["LabelRenderer (色彩徽章/多語系下拉)"]
+        Adapter["ArasAdapter"]
+    end
+    subgraph ArasServer["Aras Innovator Server & DB"]
+        SessionContext["Session Context (登入語系代碼)"]
+        IOMEngine["IOM Engine"]
+        BCSLabel["ItemType: bcs_label"]
+        BCSTags["Relationship: bcs_label_tags (ml_string)"]
+        TargetProp[("目標文字欄位: labels (多語系 JSON)")]
+    end
+
+    User -->|檢視標籤 / 鍵盤搜尋 / 點擊添加| Renderer
+    Renderer -->|請求多語系顯示文字| Controller
+    Controller -->|依當下語系解析| Store
+    Controller -->|向 Adapter 請求 Session 語系與標籤來源| Adapter
+    Adapter -->|讀取使用者語系| SessionContext
+    Adapter -->|IOM 查詢多語系標籤資料| IOMEngine
+    IOMEngine --> BCSLabel
+    BCSLabel --> BCSTags
+    Controller -->|同步 JSON 屬性 handleItemChange| Adapter
+    Adapter -->|更新 Form Item DOM| Form
+    Form -->|儲存表單| TargetProp
+```
+
+### 3.2 模組關係圖 (Class Diagram)
+```mermaid
+classDiagram
+    class LabelTag {
+        +string name
+        +string label
+        +Object labels
+        +string color
+        +float sort_id
+        +getDisplayLabel(langCode: string, fallbackLang: string): string
+        +getContrastTextColor(): string
+        +toJSON(): Object
+        +static fromJSON(obj: Object): LabelTag
+    }
+
+    class LabelStore {
+        -Array~LabelTag~ tags
+        +add(tag: LabelTag): boolean
+        +removeByName(name: string): boolean
+        +has(name: string): boolean
+        +getAll(): Array~LabelTag~
+        +serializeJSON(): string
+        +deserializeJSON(jsonString: string): void
+        +clear(): void
+    }
+
+    class IArasAdapter {
+        <<interface>>
+        +getCurrentLanguage(): string
+        +fetchAvailableTags(categoryName: string): Promise~Array~LabelTag~~
+        +getPropertyValue(propertyName: string): string
+        +setPropertyValue(propertyName: string, jsonValue: string): void
+        +isEditMode(): boolean
+    }
+
+    class ArasAdapter {
+        -arasObj: Object
+        -itemObj: Object
+        +getCurrentLanguage(): string
+        +fetchAvailableTags(categoryName: string): Promise~Array~LabelTag~~
+        +getPropertyValue(propertyName: string): string
+        +setPropertyValue(propertyName: string, jsonValue: string): void
+        +isEditMode(): boolean
+    }
+
+    class MockArasAdapter {
+        -mockTags: Array~LabelTag~
+        -currentLanguage: string
+        -itemProperties: Map
+        -editMode: boolean
+        +getCurrentLanguage(): string
+        +fetchAvailableTags(categoryName: string): Promise~Array~LabelTag~~
+        +getPropertyValue(propertyName: string): string
+        +setPropertyValue(propertyName: string, jsonValue: string): void
+        +isEditMode(): boolean
+    }
+
+    class LabelRenderer {
+        -HTMLElement container
+        -Object callbacks
+        +render(selectedTags: Array~LabelTag~, isEditMode: boolean, langCode: string): void
+        +renderDropdown(availableTags: Array~LabelTag~, filterQuery: string, langCode: string): void
+        +hideDropdown(): void
+        +bindEvents(callbacks: Object): void
+    }
+
+    class MultiLabelController {
+        -LabelStore store
+        -LabelRenderer renderer
+        -IArasAdapter adapter
+        -Array~LabelTag~ availableTags
+        -string currentLanguage
+        +init(): Promise~void~
+        +handleSelectTag(tag: LabelTag): void
+        +handleRemoveTag(name: string): void
+        +handleSearchInput(query: string): void
+    }
+
+    IArasAdapter <|.. ArasAdapter
+    IArasAdapter <|.. MockArasAdapter
+    LabelStore o-- LabelTag
+    MultiLabelController --> LabelStore
+    MultiLabelController --> LabelRenderer
+    MultiLabelController --> IArasAdapter
+```
+
+### 3.3 多語系解析序列圖 (Sequence Diagram - Multilingual Display)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 使用者 (zh-TW 語系)
+    participant Ctrl as MultiLabelController
+    participant Adapt as ArasAdapter
+    participant Store as LabelStore
+    participant View as LabelRenderer
+
+    User->>Ctrl: 開啟表單 (onFormPopulated)
+    Ctrl->>Adapt: getCurrentLanguage()
+    Adapt-->>Ctrl: "zh-TW"
+    Ctrl->>Adapt: fetchAvailableTags("Part_Labels")
+    Adapt-->>Ctrl: Array<LabelTag> (含多語系 labels 字典)
+    Ctrl->>Adapt: getPropertyValue("labels")
+    Adapt-->>Ctrl: 儲存之 JSON 字串
+    Ctrl->>Store: deserializeJSON(rawJSON)
+    Ctrl->>Store: getAll()
+    Store-->>Ctrl: selectedTags
+    Ctrl->>View: render(selectedTags, isEditMode=true, langCode="zh-TW")
+    loop 每一枚標籤
+        View->>LabelTag: getDisplayLabel("zh-TW")
+        LabelTag-->>View: "緊急處理" (依語系取得顯示名)
+    end
+    View-->>User: 繪製對應語系之彩色標籤徽章
+```
+
+### 3.4 流程圖 (Flowchart - 多語系文字取得與 Fallback 邏輯)
+```mermaid
+flowchart TD
+    Start([請求標籤顯示名稱]) --> CheckLang{labels 字典中是否有指定 langCode?}
+    CheckLang -- 有且非空 --> ReturnLang[返回 labels[langCode]]
+    CheckLang -- 無 --> CheckDefaultLabel{實體是否有預設 label 欄位?}
+    CheckDefaultLabel -- 有且非空 --> ReturnLabel[返回 label]
+    CheckDefaultLabel -- 無 --> CheckEn{labels 字典是否有 'en' 語系?}
+    CheckEn -- 有 --> ReturnEn[返回 labels['en']]
+    CheckEn -- 無 --> ReturnName[安全退回返回 name 鍵值代碼]
+    ReturnLang --> End([輸出顯示文字])
+    ReturnLabel --> End
+    ReturnEn --> End
+    ReturnName --> End
+```
+
+---
+
+## 4. 多語系核心虛擬碼 (Pseudocode)
+
+```typescript
+class LabelTag {
+    name: string;
+    label: string;
+    labels: Record<string, string>; // 多語系字典 e.g. { "zh-TW": "緊急", "en": "Urgent" }
+    color: string;
+    sort_id: number;
+
+    getDisplayLabel(langCode: string = "zh-TW", fallbackLang: string = "en"): string {
+        if (this.labels && typeof this.labels === "object") {
+            if (this.labels[langCode]) return this.labels[langCode];
+            // 語系代碼相容性匹配 (如 zh-TW 配對 zh)
+            const baseLang = langCode.split("-")[0];
+            if (this.labels[baseLang]) return this.labels[baseLang];
+            if (this.labels[fallbackLang]) return this.labels[fallbackLang];
+        }
+        return this.label || this.name;
+    }
+}
+```
