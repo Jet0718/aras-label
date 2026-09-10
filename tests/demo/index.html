@@ -172,15 +172,67 @@
   </div>
 
   <!-- 載入模組 -->
+  <link rel="stylesheet" href="../../src/search/search-widget.css" />
   <script src="../../src/models/LabelTag.js"></script>
   <script src="../../src/core/LabelStore.js"></script>
   <script src="../../src/core/LabelRenderer.js"></script>
   <script src="../../src/adapter/IArasAdapter.js"></script>
   <script src="../../src/adapter/MockArasAdapter.js"></script>
   <script src="../../src/controller/MultiLabelController.js"></script>
+  <script src="../../src/search/SearchCriteriaTranslator.js"></script>
+  <script src="../../src/search/GridCellFormatter.js"></script>
+  <script src="../../src/search/LabelSearchWidget.js"></script>
+
+  <!-- 模擬 Aras 主網格搜尋 (Main Grid Search) 區塊 -->
+  <div class="aras-window" style="margin-top: 40px; margin-bottom: 50px;">
+    <div class="aras-header" style="background: #0F766E;">
+      <h1>
+        <span>Aras Innovator R36 - Part Search Grid (主網格模糊搜尋展示)</span>
+        <span class="aras-status-pill" style="background: #14B8A6;">Main Grid Search</span>
+      </h1>
+      <span style="font-size: 12px; color: #CCFBF1;">Simple Search Mode</span>
+    </div>
+
+    <!-- 搜尋工具與欄位過濾列 -->
+    <div style="padding: 16px 24px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+      <div style="font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 10px;">
+        🔍 網格簡易搜尋列 (Simple Search Row) - 點擊標籤欄位即可勾選或輸入標籤：
+      </div>
+      <div style="display: grid; grid-template-columns: 160px 220px 1fr 100px; gap: 10px; align-items: center;">
+        <div>
+          <input type="text" placeholder="品號搜尋..." style="width: 100%; height: 28px; padding: 4px 8px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;" readonly />
+        </div>
+        <div>
+          <input type="text" placeholder="名稱搜尋..." style="width: 100%; height: 28px; padding: 4px 8px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;" readonly />
+        </div>
+        <!-- 這是搜尋列的多標籤掛載點 -->
+        <div id="searchWidgetMountPoint"></div>
+        <div>
+          <button class="aras-btn primary" id="btnRunSearch" style="width: 100%; height: 28px; padding: 0; font-size: 12px;">執行搜尋</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 搜尋結果資料表格 -->
+    <div style="padding: 20px 24px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+        <thead>
+          <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1; color: #475569;">
+            <th style="padding: 10px 12px; width: 140px;">品號 (item_number)</th>
+            <th style="padding: 10px 12px; width: 220px;">名稱 (name)</th>
+            <th style="padding: 10px 12px;">標籤清單 (labels - 彩色徽章渲染)</th>
+          </tr>
+        </thead>
+        <tbody id="gridTableBody">
+          <!-- 資料列由 JS 動態渲染 -->
+        </tbody>
+      </table>
+      <div id="gridSearchStatus" style="margin-top: 12px; font-size: 12px; color: #64748B;"></div>
+    </div>
+  </div>
 
   <script>
-    // 初始化模擬環境
+    // 1. 初始化表單環境
     const mockAdapter = new MockArasAdapter({
       currentLanguage: "zh-TW",
       editMode: true,
@@ -189,7 +241,6 @@
       }
     });
 
-    // 預先寫入預設標籤資料
     const defaultData = JSON.stringify([
       {
         name: "urgent",
@@ -250,18 +301,109 @@
     });
 
     // 語系切換按鈕
-    document.getElementById("btnLangZhTW").addEventListener("click", () => {
-      mockAdapter.setLanguage("zh-TW");
-      controller.changeLanguage("zh-TW");
+    let currentSessionLang = "zh-TW";
+    function setSystemLanguage(lang) {
+      currentSessionLang = lang;
+      mockAdapter.setLanguage(lang);
+      controller.changeLanguage(lang);
+      if (searchWidget) searchWidget.setLanguage(lang);
+      renderGridTable(); // 刷新表格
+    }
+
+    document.getElementById("btnLangZhTW").addEventListener("click", () => setSystemLanguage("zh-TW"));
+    document.getElementById("btnLangEn").addEventListener("click", () => setSystemLanguage("en"));
+    document.getElementById("btnLangZhCN").addEventListener("click", () => setSystemLanguage("zh-CN"));
+
+    // ==========================================
+    // 2. 主網格搜尋與多標籤過濾邏輯
+    // ==========================================
+    const sampleRecords = [
+      {
+        item_number: "PR-2026-0001",
+        name: "高扭矩直流無刷馬達",
+        labels: JSON.stringify([
+          { name: "urgent", label: "緊急處理", labels: { "zh-TW": "緊急處理", "en": "Urgent Action", "zh-CN": "紧急处理" }, color: "#EF4444", sort_id: 10 },
+          { name: "design", label: "設計階段", labels: { "zh-TW": "設計階段", "en": "Design Stage", "zh-CN": "设计阶段" }, color: "#3B82F6", sort_id: 30 }
+        ])
+      },
+      {
+        item_number: "PR-2026-0002",
+        name: "光學感應器總成",
+        labels: JSON.stringify([
+          { name: "vip", label: "VIP客戶", labels: { "zh-TW": "VIP客戶", "en": "VIP Customer", "zh-CN": "VIP客户" }, color: "#8B5CF6", sort_id: 20 },
+          { name: "review", label: "覆核審查", labels: { "zh-TW": "覆核審查", "en": "In Review", "zh-CN": "复核审查" }, color: "#10B981", sort_id: 40 }
+        ])
+      },
+      {
+        item_number: "PR-2026-0003",
+        name: "航太級鈦合金軸承",
+        labels: JSON.stringify([
+          { name: "urgent", label: "緊急處理", labels: { "zh-TW": "緊急處理", "en": "Urgent Action", "zh-CN": "紧急处理" }, color: "#EF4444", sort_id: 10 },
+          { name: "vip", label: "VIP客戶", labels: { "zh-TW": "VIP客戶", "en": "VIP Customer", "zh-CN": "VIP客户" }, color: "#8B5CF6", sort_id: 20 }
+        ])
+      },
+      {
+        item_number: "PR-2026-0004",
+        name: "標準六角螺紋緊固件",
+        labels: JSON.stringify([
+          { name: "hold", label: "暫緩作業", labels: { "zh-TW": "暫緩作業", "en": "On Hold", "zh-CN": "暂缓作业" }, color: "#F59E0B", sort_id: 50 }
+        ])
+      }
+    ];
+
+    let currentFilterCriteria = { tagKeys: [], rawInput: "", mode: "AND" };
+
+    // 初始化搜尋列組件
+    const searchWidget = new LabelSearchWidget({
+      container: "searchWidgetMountPoint",
+      availableTags: mockAdapter.mockTags,
+      currentLanguage: currentSessionLang,
+      defaultMode: "AND",
+      onApplySearch: (criteria) => {
+        currentFilterCriteria = criteria;
+        renderGridTable();
+      }
     });
-    document.getElementById("btnLangEn").addEventListener("click", () => {
-      mockAdapter.setLanguage("en");
-      controller.changeLanguage("en");
+
+    document.getElementById("btnRunSearch").addEventListener("click", () => {
+      searchWidget.parseInputAndSearch();
     });
-    document.getElementById("btnLangZhCN").addEventListener("click", () => {
-      mockAdapter.setLanguage("zh-CN");
-      controller.changeLanguage("zh-CN");
-    });
+
+    function renderGridTable() {
+      const tbody = document.getElementById("gridTableBody");
+      tbody.innerHTML = "";
+
+      const terms = currentFilterCriteria.tagKeys && currentFilterCriteria.tagKeys.length > 0 
+        ? currentFilterCriteria.tagKeys 
+        : SearchCriteriaTranslator.parseTerms(currentFilterCriteria.rawInput);
+
+      const filtered = sampleRecords.filter((rec) => {
+        if (terms.length === 0) return true;
+        return SearchCriteriaTranslator.matchesRecord(rec.labels, terms, currentFilterCriteria.mode);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 24px; color: #94A3B8;">查無符合所選標籤的資料項目</td></tr>`;
+      } else {
+        filtered.forEach((rec) => {
+          const tr = document.createElement("tr");
+          tr.style.borderBottom = "1px solid #E2E8F0";
+          tr.innerHTML = `
+            <td style="padding: 10px 12px; font-weight: 500; color: #1E293B;">${rec.item_number}</td>
+            <td style="padding: 10px 12px; color: #475569;">${rec.name}</td>
+            <td style="padding: 10px 12px;">${GridCellFormatter.formatToHTML(rec.labels, currentSessionLang)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      const statusEl = document.getElementById("gridSearchStatus");
+      statusEl.textContent = `共顯示 ${filtered.length} / ${sampleRecords.length} 筆資料 (條件模式: ${currentFilterCriteria.mode}, 篩選項目: ${terms.length > 0 ? terms.join(', ') : '無'})`;
+    }
+
+    // 初始化渲染表格
+    renderGridTable();
   </script>
+
 </body>
 </html>

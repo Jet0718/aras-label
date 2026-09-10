@@ -254,3 +254,174 @@ class LabelTag {
     }
 }
 ```
+
+---
+
+## 5. Search 介面 Multi-Tags 輸入與模糊搜尋規格
+
+### 5.1 需求與背景
+在 Aras Innovator R36 的主網格搜尋（Main Grid Search / Simple Search）或搜尋對話框中：
+1. 目標屬性欄位中儲存的是 JSON 陣列（例如包含 `[{"name":"urgent", "label":"緊急處理", ...}]`）。
+2. 使用者需要在搜尋介面中：
+   - 能夠以點選方式（浮層挑選面板）或文字輸入挑選標籤（例如選擇「緊急處理」）。
+   - 支援輸入或挑選多筆標籤，並可設定搜尋條件關係為 **AND（同時包含所選標籤）** 或 **OR（包含任一標籤）**。
+   - 支援跨語系模糊比對（無論使用者以中文「緊急處理」、代碼「urgent」或英文「Urgent」搜尋，皆能命中包含該標籤的項目）。
+3. 搜尋結果 Grid 中，該文字欄位應由原始 JSON 字串自動轉換為彩色標籤徽章（Grid Cell Formatter），提供直觀清晰的檢視體驗。
+
+### 5.2 搜尋架構設計與選型
+- **前端搜尋輸入層 (`LabelSearchWidget`)**：
+  在 Simple Search 的欄位輸入框旁掛載浮層按鈕或點擊彈出彩色標籤勾選浮層，讓使用者免去手動輸入 JSON 萬用字元的繁瑣。
+- **後端轉譯層 (`bcs_label_search_handler` - onBeforeGet)**：
+  目標 ItemType 掛載 `onBeforeGet` Server Method。
+  當攔截到針對 `labels` 欄位的查詢時，解析標籤鍵值並將條件自動展開為標準高效的 SQL/AML 條件：
+  - 單一標籤：「緊急處理」 -> `labels LIKE '%"name":"urgent"%'`
+  - 多標籤 AND：「緊急處理」AND「VIP客戶」 -> `labels LIKE '%"name":"urgent"%' AND labels LIKE '%"name":"vip"%'`
+  - 多標籤 OR：「緊急處理」OR「設計階段」 -> `(labels LIKE '%"name":"urgent"%' OR labels LIKE '%"name":"design"%')`
+- **結果列表渲染層 (`GridCellFormatter`)**：
+  在 Grid 渲染回調中將 JSON 字串解析為彩色 Badge。
+
+---
+
+## 6. Search 模組 Mermaid 圖表集
+
+### 6.1 搜尋系統脈絡圖 (Search System Context)
+```mermaid
+flowchart TD
+    User["使用者 (Aras Search Grid)"]
+    SearchWidget["LabelSearchWidget (搜尋列浮層選擇器)"]
+    Grid["Aras Innovator Main Grid Engine"]
+    ServerHandler["Server Method: bcs_label_search_handler (onBeforeGet)"]
+    DB[(Database: Item Property with JSON)]
+
+    User -->|點選標籤 / 鍵盤過濾| SearchWidget
+    SearchWidget -->|產生標籤搜尋條件運算式| Grid
+    Grid -->|送出 AML Get 請求| ServerHandler
+    ServerHandler -->|轉譯為高效 JSON 子字串 SQL/AML| DB
+    DB -->|回傳資料集| Grid
+    Grid -->|GridCellFormatter 渲染彩色徽章| User
+```
+
+### 6.2 搜尋轉譯序列圖 (Search Translation Sequence Diagram)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 使用者
+    participant UI as LabelSearchWidget
+    participant Client as Aras Client Engine
+    participant Svr as onBeforeGet Method
+    participant DB as SQL Server
+
+    User->>UI: 在 labels 搜尋欄點選「緊急處理」與「VIP客戶」
+    User->>UI: 選擇模式為 AND (且)
+    UI->>Client: 填入語意化條件: [緊急處理] & [VIP客戶]
+    Client->>Svr: 送出 AML 查詢請求 (action="get")
+    Note over Svr: onBeforeGet 攔截並解析條件
+    Svr->>Svr: 比對 bcs_label_tags 取得 Key: "urgent", "vip"
+    Svr->>Svr: 重寫 AML 條件為: labels LIKE '%"name":"urgent"%' AND labels LIKE '%"name":"vip"%'
+    Svr->>DB: 執行 SQL 查詢
+    DB-->>Svr: 返回命中項目
+    Svr-->>Client: 回傳資料項目 XML
+    Client->>UI: GridCellFormatter 渲染為彩色 Chips
+    UI-->>User: 呈現直觀搜尋結果列表
+```
+
+### 6.3 搜尋決策流程圖 (Search Logic Flowchart)
+```mermaid
+flowchart TD
+    Start([收到查詢請求 (onBeforeGet)]) --> CheckProperty{搜尋條件是否包含 labels 欄位?}
+    CheckProperty -- 否 --> PassThrough([直接放行原生查詢])
+    CheckProperty -- 是 --> ExtractInput[擷取使用者輸入關鍵字或代碼]
+    ExtractInput --> ParseTerms[依逗號或分號分割為標籤查詢項目]
+    ParseTerms --> QueryCatalog[對齊 bcs_label_tags 目錄]
+    QueryCatalog --> MatchKey[轉換為標籤唯一代碼 Key (如 urgent, vip)]
+    MatchKey --> BuildClause[生成 JSON 子字串 LIKE 條件式]
+    BuildClause --> RewriteAML[動態重寫當前 AML 之 criteria 節點]
+    RewriteAML --> ExecuteQuery([放行轉譯後查詢])
+```
+
+### 6.4 後端關鍵類別圖 (Class Diagram - Server-side & Translator)
+```mermaid
+classDiagram
+    class ISearchCriteriaTranslator {
+        <<interface>>
+        +parseCriteria(criteriaText: string): Array~string~
+        +buildLikeCondition(tagKeys: Array~string~, mode: string): string
+        +buildAMLFilter(propertyName: string, tagKeys: Array~string~, mode: string): string
+    }
+
+    class SearchCriteriaTranslator {
+        +static parseCriteria(criteriaText: string): Array~string~
+        +static buildLikeCondition(tagKeys: Array~string~, mode: string): string
+        +static buildAMLFilter(propertyName: string, tagKeys: Array~string~, mode: string): string
+    }
+
+    class BcsLabelSearchHandler {
+        -IServerConnection arasServer
+        +apply(itemAML: Item): Item
+        +resolveTagKeys(inputNames: Array~string~): Array~string~
+        +injectCriteria(queryItem: Item, tagKeys: Array~string~, operator: string): void
+    }
+
+    ISearchCriteriaTranslator <|.. SearchCriteriaTranslator
+    BcsLabelSearchHandler --> SearchCriteriaTranslator
+```
+
+### 6.5 搜尋狀態圖 (Search State Diagram)
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: 搜尋列就緒
+    Idle --> PopoverOpened: 使用者點擊標籤搜尋列
+    
+    state PopoverOpened {
+        Selecting: 點選彩色候選標籤
+        SwitchingMode: 切換 AND / OR 運算子
+        Selecting --> Selecting: 多選/取消標籤
+        Selecting --> SwitchingMode: 點擊切換模式
+        SwitchingMode --> Selecting: 繼續勾選
+    }
+
+    PopoverOpened --> SearchExecuting: 點擊「套用搜尋」或按 Enter
+    SearchExecuting --> ResultRendering: 後端 onBeforeGet 命中資料返回
+    ResultRendering --> Idle: Grid 顯示彩色標籤完成
+```
+
+---
+
+## 7. 後端 API / Method 介面設計 (AML & Controller 規劃)
+
+### 7.1 Server Method: `bcs_label_search_handler` (C# .NET)
+- **語言實作**：C# (.NET)。Aras Innovator 伺服器端環境原生執行。
+- **預設運算邏輯**：**AND (交集)**，資料必須同時包含使用者所選的所有標籤。
+- **觸發事件**：目標 ItemType (如 `Part`) 的 **`onBeforeGet`**。
+- **輸入 (AML Request)**：
+  ```xml
+  <Item type="Part" action="get">
+    <labels condition="like">*緊急處理*</labels>
+  </Item>
+  ```
+- **轉譯後輸出 (Transformed AML)**：
+  ```xml
+  <Item type="Part" action="get">
+    <!-- 動態展開為 JSON 屬性關鍵鍵值 LIKE 匹配 (AND 邏輯) -->
+    <and>
+      <labels condition="like">%"name":"urgent"%</labels>
+    </and>
+  </Item>
+  ```
+- **多標籤輸入範例 (AND 關係)**：
+  ```xml
+  <Item type="Part" action="get">
+    <labels condition="like">*緊急處理,VIP重點*</labels>
+  </Item>
+  ```
+  自動轉譯為：
+  ```xml
+  <Item type="Part" action="get">
+    <and>
+      <labels condition="like">%"name":"urgent"%</labels>
+      <labels condition="like">%"name":"vip"%</labels>
+    </and>
+  </Item>
+  ```
+
+

@@ -1,0 +1,221 @@
+/**
+ * @file search-widget.css
+ * @description Aras Innovator Search 介面多標籤選擇浮層與 Grid 彩色徽章樣式表
+ */
+
+/* 搜尋輸入列的包裝器 */
+.bcs-search-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bcs-search-field-input {
+  width: 100%;
+  height: 28px;
+  padding: 4px 28px 4px 8px;
+  font-size: 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  outline: none;
+  background-color: #FFFFFF;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bcs-search-field-input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* 觸發標籤挑選浮層的小圖示按鈕 */
+.bcs-search-picker-btn {
+  position: absolute;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.bcs-search-picker-btn:hover {
+  background: #F1F5F9;
+  color: #1E293B;
+}
+
+/* 標籤挑選彈出浮層 (Popover) */
+.bcs-search-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 280px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  z-index: 9999;
+  padding: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box;
+  display: none;
+  animation: bcsPopoverFade 0.15s ease-out;
+}
+
+.bcs-search-popover.is-open {
+  display: block;
+}
+
+/* 浮層標題與模式切換區 */
+.bcs-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 8px;
+}
+
+.bcs-popover-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+/* AND / OR 運算子切換開關 */
+.bcs-mode-toggle {
+  display: inline-flex;
+  background: #F1F5F9;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.bcs-mode-btn {
+  font-size: 11px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #64748B;
+  transition: all 0.15s;
+}
+
+.bcs-mode-btn.is-active {
+  background: #3B82F6;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 候選標籤清單 */
+.bcs-popover-list {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 2px;
+}
+
+/* 標籤勾選項 */
+.bcs-popover-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #1E293B;
+  transition: background-color 0.12s;
+}
+
+.bcs-popover-item:hover {
+  background-color: #F8FAFC;
+}
+
+.bcs-popover-item.is-selected {
+  background-color: #EFF6FF;
+}
+
+.bcs-popover-checkbox {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.bcs-popover-tag-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* 浮層底部按鈕區 */
+.bcs-popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.bcs-popover-action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #475569;
+  cursor: pointer;
+}
+
+.bcs-popover-action-btn.apply {
+  background: #3B82F6;
+  color: #FFFFFF;
+  border-color: #2563EB;
+}
+
+.bcs-popover-action-btn:hover {
+  opacity: 0.9;
+}
+
+/* Grid Cell 彩色徽章渲染樣式 */
+.bcs-grid-tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.bcs-grid-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+
+@keyframes bcsPopoverFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -88,7 +88,7 @@
 提供兩種方式建立此模型：
 
 #### 方式 A：透過 AML 快速匯入（推薦）
-將專案中 `src/aras/aml/bcs_label_ItemType.xml` 複製，在 Aras Web Client 的 **Administration > Apply AML** 執行，即可一鍵建立 `bcs_label` ItemType 與 `bcs_label_tags` 關聯。
+將專案中 `src/aras/aml/bcs_label_ItemType.xml` 複製，在 Aras nash Client 的 **Apply AML** 執行，即可一鍵建立 `bcs_label` ItemType 與 `bcs_label_tags` 關聯。
 
 #### 方式 B：手動介面建立
 1. **建立主表 ItemType**:
@@ -139,6 +139,23 @@
    }
    ```
 3. 儲存並解鎖 Form。
+
+### 步驟 5：設定 Search 介面 Multi-Tags 模糊搜尋 (Server Method & Client Widget)
+1. **建立 Server Method (`bcs_label_search_handler`)**：
+   - 進入 **Administration > Methods**，新增 Method：
+     - **Name**: `bcs_label_search_handler`
+     - **Method Type**: `C#` (或 JavaScript)
+     - **Code**: 複製 `src/aras/server/bcs_label_search_handler.cs` 的程式碼並儲存。
+2. **在目標 ItemType 掛載 Server Event**：
+   - 開啟目標 ItemType（如 `Part`）。
+   - 切換至 **Server Events** 頁籤，新增事件關聯：
+     - **Event**: `onBeforeGet`
+     - **Related Method**: 選擇 `bcs_label_search_handler`
+   - 儲存 ItemType。
+3. **完成效果**：
+   - 使用者在主網格搜尋欄位可直接選取「緊急處理」或輸入多標籤（如 `緊急處理,VIP重點`）。
+   - 後端將自動轉譯為針對 JSON 屬性關鍵代碼（`urgent`, `vip`）的子字串模糊匹配，精準命中包含該標籤的所有資料！
+
 
 ---
 
