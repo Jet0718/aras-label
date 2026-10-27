@@ -306,32 +306,74 @@
     const propertyName = config.propertyName || "labels";
     const categoryName = config.labelCategoryName || "Part_Labels";
 
-    // 建立 Aras 原生適配層
-    const currentLang = (window.aras && window.aras.getSessionContext) 
-      ? window.aras.getSessionContext().getLanguageCode() 
-      : "zh-TW";
+    // 跨視窗層次尋找 Aras 全域核心物件與 Form Item
+    const parentWin = window.parent || window;
+    const topWin = window.top || window;
+    const arasObj = window.aras || parentWin.aras || topWin.aras;
+    const itemNode = (window.document && window.document.item) || (parentWin.document && parentWin.document.item) || (topWin.document && topWin.document.item);
+    const thisItemObj = (window.document && window.document.thisItem) || (parentWin.document && parentWin.document.thisItem);
+    const handleItemChangeFn = window.handleItemChange || parentWin.handleItemChange || topWin.handleItemChange;
 
-    const isEditMode = (window.document && typeof window.document.isEditMode !== "undefined")
-      ? Boolean(window.document.isEditMode)
-      : true;
-
-    // 取得現有資料
-    let rawJSON = "";
-    if (window.document && window.document.item) {
-      rawJSON = window.document.item.getProperty ? window.document.item.getProperty(propertyName) : "";
+    // 1. 取得當前使用者登入語系
+    let currentLang = "zh-TW";
+    try {
+      if (arasObj && typeof arasObj.getSessionContext === "function") {
+        currentLang = arasObj.getSessionContext().getLanguageCode() || "zh-TW";
+      } else if (arasObj && typeof arasObj.getLanguageCode === "function") {
+        currentLang = arasObj.getLanguageCode() || "zh-TW";
+      }
+    } catch (e) {
+      currentLang = "zh-TW";
     }
+
+    // 2. 判斷表單是否處於可編輯狀態 (Edit Mode)
+    let isEditMode = true;
+    try {
+      if (typeof window.isEditMode !== "undefined") {
+        isEditMode = Boolean(window.isEditMode);
+      } else if (window.document && typeof window.document.isEditMode !== "undefined") {
+        isEditMode = Boolean(window.document.isEditMode);
+      } else if (parentWin && typeof parentWin.isEditMode !== "undefined") {
+        isEditMode = Boolean(parentWin.isEditMode);
+      } else if (arasObj && itemNode && typeof arasObj.isLockedByUser === "function") {
+        isEditMode = Boolean(arasObj.isLockedByUser(itemNode) || arasObj.isTemp(itemNode));
+      }
+    } catch (e) {
+      isEditMode = true;
+    }
+
+    // 3. 讀取現有資料 (關鍵修復：Aras XMLNode 需透過 aras.getItemProperty 讀取)
+    let rawJSON = "";
+    try {
+      if (arasObj && itemNode && typeof arasObj.getItemProperty === "function") {
+        rawJSON = arasObj.getItemProperty(itemNode, propertyName) || "";
+      } else if (thisItemObj && typeof thisItemObj.getProperty === "function") {
+        rawJSON = thisItemObj.getProperty(propertyName, "") || "";
+      } else if (itemNode) {
+        if (typeof itemNode.getProperty === "function") {
+          rawJSON = itemNode.getProperty(propertyName) || "";
+        } else {
+          const propNode = itemNode.selectSingleNode ? itemNode.selectSingleNode(propertyName) : itemNode.querySelector(propertyName);
+          rawJSON = propNode ? (propNode.text || propNode.textContent || "") : "";
+        }
+      }
+    } catch (err) {
+      console.warn("[bcs_label] 讀取屬性失敗：", err);
+    }
+
+    console.log("[bcs_label] 初始化載入 - 屬性:", propertyName, "現有值:", rawJSON, "編輯模式:", isEditMode);
 
     const store = new LabelStore();
     store.deserializeJSON(rawJSON);
 
-    // 查詢 bcs_label 及其關聯的 bcs_label_tags
+    // 4. 查詢 bcs_label 及其關聯的 bcs_label_tags
     let availableTags = [];
-    if (window.aras && typeof window.aras.newIOMItem === "function") {
+    if (arasObj && typeof arasObj.newIOMItem === "function") {
       try {
-        const q = window.aras.newIOMItem("bcs_label", "get");
+        const q = arasObj.newIOMItem("bcs_label", "get");
         q.setAttribute("select", "name");
         q.setProperty("name", categoryName);
-        const rel = window.aras.newIOMItem("bcs_label_tags", "get");
+        const rel = arasObj.newIOMItem("bcs_label_tags", "get");
         rel.setAttribute("select", "sort_id,name,label,color");
         rel.setAttribute("orderBy", "sort_id");
         q.addRelationship(rel);
@@ -348,11 +390,11 @@
           }
         }
       } catch (err) {
-        console.warn("載入 bcs_label 標籤清單異常：", err);
+        console.warn("[bcs_label] 載入 bcs_label 標籤清單異常：", err);
       }
     }
 
-    // 繪製 UI
+    // 5. 繪製 UI
     container.classList.add("bcs-multi-label-container");
     container.innerHTML = `
       <div class="bcs-tag-wrapper ${!isEditMode ? 'is-readonly' : ''}" id="bcsTagWrapper">
@@ -394,12 +436,30 @@
       });
     }
 
+    // 6. 同步資料至 Aras Form (雙重保證 handleItemChange + setItemProperty)
     function syncValue() {
       const jsonStr = store.serializeJSON();
-      if (typeof window.handleItemChange === "function") {
-        window.handleItemChange(propertyName, jsonStr);
-      } else if (window.aras && window.document.item) {
-        window.aras.setItemProperty(window.document.item, propertyName, jsonStr);
+      console.log("[bcs_label] 同步變更至表單 - 欄位:", propertyName, "內容:", jsonStr);
+
+      // (A) 優先觸發 handleItemChange (通知 Form 髒標記與 UI 連動)
+      if (typeof handleItemChangeFn === "function") {
+        try {
+          handleItemChangeFn(propertyName, jsonStr);
+        } catch (e) {
+          console.warn("[bcs_label] handleItemChange 呼叫提示：", e);
+        }
+      }
+
+      // (B) 雙重保證：直接向底層 item XMLNode 寫入 property，並標記 edit action
+      if (arasObj && itemNode && typeof arasObj.setItemProperty === "function") {
+        try {
+          arasObj.setItemProperty(itemNode, propertyName, jsonStr);
+          if (!itemNode.getAttribute("action")) {
+            itemNode.setAttribute("action", "edit");
+          }
+        } catch (e) {
+          console.warn("[bcs_label] setItemProperty 呼叫提示：", e);
+        }
       }
     }
 

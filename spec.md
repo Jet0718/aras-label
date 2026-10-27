@@ -62,7 +62,7 @@
   - `ArasAdapter`：適配 Aras Innovator Client API，負責：
     1. 取得當前使用者登入語系 (`aras.getSessionContext().getLanguageCode()`)。
     2. 透過 IOM 查詢 `bcs_label` 及其關聯的 `bcs_label_tags`（包含各語系值）。
-    3. 透過 `handleItemChange` 寫入目標屬性。
+    3. 讀取屬性透過 `aras.getItemProperty(document.item, propertyName)`（相容 `document.thisItem` 與 XMLNode），寫入屬性則採 `handleItemChange` 搭配 `aras.setItemProperty(document.item, ...)` 雙重同步，確保表單 Dirty 狀態標記與點擊 Save 時能確實寫入資料庫。
   - `MultiLabelController`：調度控制器，統籌上述模組之生命週期與多語系動態切換。
 - **Open/Closed Principle (開放封閉原則)**：
   支援可抽換之 Adapter（正式環境的 `ArasAdapter` 與測試環境的 `MockArasAdapter`），亦可擴充新增其他語系代碼對應。
