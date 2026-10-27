@@ -439,4 +439,11 @@ stateDiagram-v2
   2. **直接撰寫方法體**：程式碼直接作為方法實體執行，入口直接使用 `this` (當前 Item) 與 `this.getInnovator()`。
   3. **確保所有路徑均有傳回值**：包含正常流程與例外捕捉區塊，必須確保皆返回 `Item`（如 `return this;` 或 `return inn.newError(...)`）。
 
+### 7.3 Client Method: `bcs_main_grid_extension` (JavaScript)
+- **語言實作**：Vanilla JavaScript (Client-side)。
+- **觸發事件**：目標 ItemType (如 `Part`) 的 **`onLoad` Client Event**。
+- **職責說明**：
+  1. **MutationObserver 監聽器**：監控 Main Grid 單元格 DOM，自動偵測含 `[{"name":` 開頭之 JSON 文字，呼叫 `GridCellFormatter` 即時彩化為深底白字或高對比圓角彩色徽章 (Chips)，徹底解決 JSON 裸露難讀問題。
+  2. **搜尋列選擇器 (Popover Widget)**：探測搜尋列「標記」欄位之輸入框，動態掛載標籤挑選按鈕與浮層，支援勾選多個標籤與 AND/OR 條件切換，點選套用時自動觸發後端 `bcs_label_search_handler` 檢索。
+
 

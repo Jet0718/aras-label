@@ -172,11 +172,11 @@
    ```
 3. 儲存並解鎖 Form。
 
-### 步驟 5：設定 Search 介面 Multi-Tags 模糊搜尋 (Server Method & Client Widget)
+### 步驟 5：設定後端 Multi-Tags 模糊搜尋轉譯器 (Server Method - onBeforeGet)
 1. **建立 Server Method (`bcs_label_search_handler`)**：
    - 進入 **Administration > Methods**，新增 Method：
      - **Name**: `bcs_label_search_handler`
-     - **Method Type**: `C#` (或 JavaScript)
+     - **Method Type**: `C#`
      - **Code**: 複製 `src/aras/server/bcs_label_search_handler.cs` 的程式碼並儲存。
 2. **在目標 ItemType 掛載 Server Event**：
    - 開啟目標 ItemType（如 `Part`）。
@@ -184,9 +184,24 @@
      - **Event**: `onBeforeGet`
      - **Related Method**: 選擇 `bcs_label_search_handler`
    - 儲存 ItemType。
+
+### 步驟 6：設定 Main Grid 彩色徽章渲染與搜尋列選擇器 (Client Method - onLoad)
+解決 Main Search 網格中 JSON 原始內容不易閱讀、以及搜尋欄無法點擊挑選標籤的問題：
+1. **建立 Client Method (`bcs_main_grid_extension`)**：
+   - 進入 **Administration > Methods**，新增 Method：
+     - **Name**: `bcs_main_grid_extension`
+     - **Method Type**: `JavaScript`
+     - **Execution Mode**: `Client`
+     - **Code**: 複製 `src/aras/client/bcs_main_grid_extension.js` 的程式碼並儲存。
+2. **在目標 ItemType 掛載 Client Event**：
+   - 開啟目標 ItemType（如 `Part`），點擊 **Edit** 鎖定。
+   - 切換至 **Client Events** 頁籤，新增一列關聯：
+     - **Event**: `onLoad`
+     - **Related Method**: 選擇 `bcs_main_grid_extension`
+   - 點擊 **Save** 並 **Done** 解鎖 ItemType。
 3. **完成效果**：
-   - 使用者在主網格搜尋欄位可直接選取「緊急處理」或輸入多標籤（如 `緊急處理,VIP重點`）。
-   - 後端將自動轉譯為針對 JSON 屬性關鍵代碼（`urgent`, `vip`）的子字串模糊匹配，精準命中包含該標籤的所有資料！
+   - 🎨 **網格即時彩化**：列表中「標記」欄位的生硬 JSON 字串自動轉化為美觀易讀的彩色標籤徽章 (Chips)！
+   - 🔍 **搜尋互動彈窗**：在搜尋列的「標記」欄位點擊或輸入時，自動彈出標籤勾選面板（含色彩小圓點、AND/OR 邏輯切換與套用按鈕），點選後自動觸發後端精準搜尋！
 
 
 ---
