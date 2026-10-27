@@ -120,13 +120,21 @@
    - **Data Type**: `String`（長度建議設為 `2048` 或以上）或 `Text`。
 3. 儲存 ItemType。
 
-### 步驟 3：在 Form 放置 HTML Field
-1. 進入該 ItemType 的 Form 編輯畫面。
-2. 在表單工具列拖入一個 **HTML Field**：
-   - **Field Name**: `field_bcs_labels`
-   - **Field Label**: `標籤 (Labels)`
-   - **Field Type**: `html`
-3. 點擊該欄位之 **HTML Code**，貼入 `src/aras/Form_MultiLabel_Field.html` 中的程式碼。
+### 步驟 3：在 Form 放置隱藏原生欄位與 HTML Field（隱藏屬性綁定技巧）
+> [!IMPORTANT]
+> **Aras 表單核心機制注意**：在 Aras Innovator 中，若表單上「未存在該屬性之 Field 節點」，Aras 表單引擎在載入（Get）與儲存（Save）時將不會自動將該屬性打包傳遞。因此需要採用 Aras 官方標準的「隱藏屬性技巧（Hidden Property Technique）」，在 Form 上放置一個隱藏的原生 `labels` 欄位作為底層資料通道。
+
+1. 進入該 ItemType 的 Form 編輯畫面（例如 `Part` 表單）。
+2. **放置原生 `labels` 欄位並設為隱藏**：
+   - 從左側未使用的屬性清單（Unused Properties）中將 **`labels`** 拖入表單編輯區。
+   - 點選該 `labels` 欄位，在左下角屬性面板中切換至 **Field Physical** 頁籤。
+   - 將 **Visible** 屬性改為 **False**（取消勾選，隱藏該原生文字框）。
+3. **放置自訂 HTML Field**：
+   - 在表單工具列拖入一個 **HTML Field**（放置在您希望呈現標籤的位置，如右上角）：
+     - **Field Name**: `field_bcs_labels`
+     - **Field Label**: `標籤 (Labels)`
+     - **Field Type**: `html`
+   - 點擊該欄位之 **HTML Code**，貼入 `src/aras/Form_MultiLabel_Field.html` 中的完整程式碼。
 
 ### 步驟 4：設定 Form Event (`onFormPopulated`)
 1. 在 Form 的 **Form Events** 頁籤新增事件關聯：

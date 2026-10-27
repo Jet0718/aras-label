@@ -310,8 +310,10 @@
     const parentWin = window.parent || window;
     const topWin = window.top || window;
     const arasObj = window.aras || parentWin.aras || topWin.aras;
-    const itemNode = (window.document && window.document.item) || (parentWin.document && parentWin.document.item) || (topWin.document && topWin.document.item);
-    const thisItemObj = (window.document && window.document.thisItem) || (parentWin.document && parentWin.document.thisItem);
+    const curDoc = window.document;
+    const parentDoc = (parentWin && parentWin.document) || curDoc;
+    const itemNode = (curDoc && curDoc.item) || (parentDoc && parentDoc.item) || (topWin.document && topWin.document.item);
+    const thisItemObj = (curDoc && curDoc.thisItem) || (parentDoc && parentDoc.thisItem);
     const handleItemChangeFn = window.handleItemChange || parentWin.handleItemChange || topWin.handleItemChange;
 
     // 1. 取得當前使用者登入語系
@@ -342,10 +344,15 @@
       isEditMode = true;
     }
 
-    // 3. 讀取現有資料 (關鍵修復：Aras XMLNode 需透過 aras.getItemProperty 讀取)
+    // 3. 讀取現有資料 (多層 Fallback 策略)
     let rawJSON = "";
     try {
-      if (arasObj && itemNode && typeof arasObj.getItemProperty === "function") {
+      // (A) 優先檢查表單上是否有對應名稱的原生輸入欄位 (隱藏屬性技巧)
+      const nativeField = (curDoc && (curDoc.getElementsByName(propertyName)[0] || curDoc.querySelector(`[name='${propertyName}']`))) ||
+                          (parentDoc && (parentDoc.getElementsByName(propertyName)[0] || parentDoc.querySelector(`[name='${propertyName}']`)));
+      if (nativeField && nativeField.value) {
+        rawJSON = nativeField.value;
+      } else if (arasObj && itemNode && typeof arasObj.getItemProperty === "function") {
         rawJSON = arasObj.getItemProperty(itemNode, propertyName) || "";
       } else if (thisItemObj && typeof thisItemObj.getProperty === "function") {
         rawJSON = thisItemObj.getProperty(propertyName, "") || "";
@@ -436,12 +443,32 @@
       });
     }
 
-    // 6. 同步資料至 Aras Form (雙重保證 handleItemChange + setItemProperty)
+    // 6. 同步資料至 Aras Form (四重保證機制)
     function syncValue() {
       const jsonStr = store.serializeJSON();
       console.log("[bcs_label] 同步變更至表單 - 欄位:", propertyName, "內容:", jsonStr);
 
-      // (A) 優先觸發 handleItemChange (通知 Form 髒標記與 UI 連動)
+      // (A) 若表單上有 labels 原生欄位 (Hidden Property)，直接更新值並派發 change 事件
+      try {
+        const curD = window.document;
+        const parD = (window.parent && window.parent.document) || curD;
+        const nativeInput = (curD && (curD.getElementsByName(propertyName)[0] || curD.querySelector(`[name='${propertyName}']`))) ||
+                            (parD && (parD.getElementsByName(propertyName)[0] || parD.querySelector(`[name='${propertyName}']`)));
+        if (nativeInput) {
+          nativeInput.value = jsonStr;
+          if ("createEvent" in document) {
+            const evt = document.createEvent("HTMLEvents");
+            evt.initEvent("change", false, true);
+            nativeInput.dispatchEvent(evt);
+          } else if (nativeInput.fireEvent) {
+            nativeInput.fireEvent("onchange");
+          }
+        }
+      } catch (e) {
+        console.warn("[bcs_label] 同步原生欄位提示：", e);
+      }
+
+      // (B) 優先觸發 handleItemChange (通知 Form 髒標記與 UI 連動)
       if (typeof handleItemChangeFn === "function") {
         try {
           handleItemChangeFn(propertyName, jsonStr);
@@ -450,7 +477,16 @@
         }
       }
 
-      // (B) 雙重保證：直接向底層 item XMLNode 寫入 property，並標記 edit action
+      // (C) 直接向 document.thisItem 物件同步
+      if (thisItemObj && typeof thisItemObj.setProperty === "function") {
+        try {
+          thisItemObj.setProperty(propertyName, jsonStr);
+        } catch (e) {
+          console.warn("[bcs_label] thisItem.setProperty 呼叫提示：", e);
+        }
+      }
+
+      // (D) 直接向底層 item XMLNode 寫入 property，並標記 edit action
       if (arasObj && itemNode && typeof arasObj.setItemProperty === "function") {
         try {
           arasObj.setItemProperty(itemNode, propertyName, jsonStr);
