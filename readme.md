@@ -185,20 +185,42 @@
      - **Related Method**: 選擇 `bcs_label_search_handler`
    - 儲存 ItemType。
 
-### 步驟 6：設定 Main Grid 彩色徽章渲染與搜尋列選擇器 (Client Method - onLoad)
+### 步驟 6：設定 Main Grid 彩色徽章渲染與搜尋列選擇器 (Client Method)
 解決 Main Search 網格中 JSON 原始內容不易閱讀、以及搜尋欄無法點擊挑選標籤的問題：
+
 1. **建立 Client Method (`bcs_main_grid_extension`)**：
    - 進入 **Administration > Methods**，新增 Method：
      - **Name**: `bcs_main_grid_extension`
      - **Method Type**: `JavaScript`
      - **Execution Mode**: `Client`
-     - **Code**: 複製 `src/aras/client/bcs_main_grid_extension.js` 的程式碼並儲存。
-2. **在目標 ItemType 掛載 Client Event**：
-   - 開啟目標 ItemType（如 `Part`），點擊 **Edit** 鎖定。
-   - 切換至 **Client Events** 頁籤，新增一列關聯：
-     - **Event**: `onLoad`
-     - **Related Method**: 選擇 `bcs_main_grid_extension`
-   - 點擊 **Save** 並 **Done** 解鎖 ItemType。
+     - **Code**: 複製 `src/aras/client/bcs_main_grid_extension.js` 的完整程式碼並儲存（已消除 TypeScript linter 警告）。
+2. **掛載至 Main Grid（選擇以下任一種標準途徑）**：
+   > [!NOTE]
+   > **架構說明**：ItemType 的 **Client Events** 頁籤只有項目實體生命週期（`OnBeforeNew`, `OnNew`, `OnAfterNew`, `OnShowItem`），**無主網格的 `onLoad`**。請使用以下方式掛載：
+
+   - **途徑 A（最推薦！最簡潔原生）：在 ItemType 的 Actions 頁籤掛載**：
+     - 開啟目標 ItemType（如 `Part`），點擊 **Edit** 鎖定。
+     - 切換至 **Actions** 頁籤（位於 Client Events 旁，非 Client Events）。
+     - 點擊 **Create** 或 **Add Row**：
+       - **Name**: `bcs_main_grid_extension`
+       - **Label**: `標記增強與彩化`
+       - **Type**: `Item`
+       - **Location**: `Client`
+       - **Target**: `None`
+       - **Method**: 選擇 `bcs_main_grid_extension`
+     - 點擊 **Save** 並 **Done**。
+     - **使用方式**：在 Part 主搜尋畫面，隨時點擊工具列 **Actions > 標記增強與彩化**，網格立即完成彩化並掛載搜尋按鈕！
+
+   - **途徑 B（全自動執行）：在 CUI CommandBarSection 掛載為 Init Method**：
+     - 進入 **Administration > Configuration > CommandBarSection**。
+     - 搜尋開啟 `com.aras.innovator.cui_default.mwt_main_grid_toolbar`。
+     - 在 **Command Bar Items** 頁籤新增一筆按鈕項目，將其 **Init Method** 設定為 `bcs_main_grid_extension`。
+     - 儲存後，每次載入 Main Grid 工具列時即自動執行擴充。
+
+   - **途徑 C（3秒即時預覽）：在瀏覽器 Console 執行**：
+     - 在 Part 搜尋畫面按 `F12` 打開開發者工具的 **Console**。
+     - 貼上 `src/aras/client/bcs_main_grid_extension.js` 代碼並按 Enter，即可瞬間看到彩化與搜尋列按鈕！
+
 3. **完成效果**：
    - 🎨 **網格即時彩化**：列表中「標記」欄位的生硬 JSON 字串自動轉化為美觀易讀的彩色標籤徽章 (Chips)！
    - 🔍 **搜尋互動彈窗**：在搜尋列的「標記」欄位點擊或輸入時，自動彈出標籤勾選面板（含色彩小圓點、AND/OR 邏輯切換與套用按鈕），點選後自動觸發後端精準搜尋！

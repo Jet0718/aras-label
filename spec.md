@@ -440,10 +440,30 @@ stateDiagram-v2
   3. **確保所有路徑均有傳回值**：包含正常流程與例外捕捉區塊，必須確保皆返回 `Item`（如 `return this;` 或 `return inn.newError(...)`）。
 
 ### 7.3 Client Method: `bcs_main_grid_extension` (JavaScript)
-- **語言實作**：Vanilla JavaScript (Client-side)。
-- **觸發事件**：目標 ItemType (如 `Part`) 的 **`onLoad` Client Event**。
+- **語言實作**：Vanilla JavaScript (Client-side)，相容 Aras R36 Monaco/TypeScript 語法檢查器（支援 `// @ts-nocheck` 與完整 JSDoc 型別）。
+- **架構特點與事件掛載途徑**：
+  > [!IMPORTANT]
+  > **重要概念**：ItemType 的 `Client Events` 頁籤僅提供項目生命週期事件（`OnBeforeNew`, `OnNew`, `OnAfterNew`, `OnShowItem`），**無主網格的 `onLoad` 選項**。
+  > 主搜尋網格 (Main Search Grid) 的自訂擴充建議採用以下三種標準途徑之一：
+
+  1. **途徑一（最推薦！最簡潔原生：ItemType Action 動作）**：
+     - 在目標 ItemType（如 `Part`）的 **`Actions`** 頁籤中新增：
+       - `Name`: `bcs_main_grid_extension`
+       - `Label`: `標記增強與彩化`
+       - `Type`: `Item`
+       - `Location`: `Client`
+       - `Target`: `None`
+       - `Method`: 選擇 `bcs_main_grid_extension`
+     - 使用者在 Main Search 工具列的 `Actions` 選單中點擊該動作即可啟動彩化與搜尋選擇器。
+  2. **途徑二（官方 R36 全自動載入：CUI CommandBarSection Init Method）**：
+     - 前往 `Administration` -> `Configuration` -> `CommandBarSection`。
+     - 開啟主網格工具列對應的 Section（如 `com.aras.innovator.cui_default.mwt_main_grid_toolbar`）。
+     - 新增一個 CommandBarItem（按鈕），將其 **`Init Method`** 指向 `bcs_main_grid_extension`。Aras 在渲染主網格工具列時將全自動觸發執行。
+  3. **途徑三（開發即時預覽：瀏覽器 Console 執行）**：
+     - 在 Main Search 網格畫面按 `F12`，在 Console 貼上 `bcs_main_grid_extension.js` 代碼執行，即刻彩化網格並掛載搜尋框。
 - **職責說明**：
-  1. **MutationObserver 監聽器**：監控 Main Grid 單元格 DOM，自動偵測含 `[{"name":` 開頭之 JSON 文字，呼叫 `GridCellFormatter` 即時彩化為深底白字或高對比圓角彩色徽章 (Chips)，徹底解決 JSON 裸露難讀問題。
+  1. **MutationObserver 監聽器**：監控 Main Grid 單元格 DOM，自動偵測含 `[{"name":` 開頭之 JSON 文字，即時彩化為高對比深/淺底圓角彩色徽章 (Chips)，徹底解決 JSON 裸露難讀問題。
   2. **搜尋列選擇器 (Popover Widget)**：探測搜尋列「標記」欄位之輸入框，動態掛載標籤挑選按鈕與浮層，支援勾選多個標籤與 AND/OR 條件切換，點選套用時自動觸發後端 `bcs_label_search_handler` 檢索。
+
 
 
