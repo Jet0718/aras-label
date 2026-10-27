@@ -39,7 +39,7 @@
       </Item>
 
       <!-- 建立實例權限 (Can Add): World -->
-      <Item type="ItemType Can Add" action="add">
+      <Item type="Can Add" action="add">
         <can_add>1</can_add>
         <related_id>
           <Item type="Identity" action="get">
