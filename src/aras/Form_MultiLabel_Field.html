@@ -618,45 +618,8 @@
         }
       });
 
-      // (E) 關鍵終極保障：直通後端資料庫更新 (即刻持久化寫入，不受客戶端刷新或解除鎖定影響)
-      if (arasObj && currentItemId && !isTempItem) {
-        let savedDirectly = false;
-        // 優先嘗試使用 Aras 核心原生 applyItem API
-        if (typeof arasObj.applyItem === "function") {
-          try {
-            const aml = `<Item type="${currentItemType}" action="edit" id="${currentItemId}" version="0"><${propertyName}><![CDATA[${jsonStr}]]></${propertyName}></Item>`;
-            const resXml = arasObj.applyItem(aml);
-            console.log("[bcs_label] applyItem 直通寫入伺服器回應：", resXml);
-            if (resXml && !resXml.includes("<faultcode>")) {
-              savedDirectly = true;
-              console.log("[bcs_label] ★★★ 後端資料庫直通保存成功 (applyItem)！ ★★★");
-            } else {
-              console.warn("[bcs_label] applyItem 直通寫入警告/錯誤：", resXml);
-            }
-          } catch (e) {
-            console.warn("[bcs_label] applyItem 執行異常：", e);
-          }
-        }
-
-        // 若 applyItem 未完成，嘗試使用 IOM API
-        if (!savedDirectly && typeof arasObj.newIOMItem === "function") {
-          try {
-            const directUpdate = arasObj.newIOMItem(currentItemType, "edit");
-            directUpdate.setID(currentItemId);
-            directUpdate.setAttribute("version", "0");
-            directUpdate.setProperty(propertyName, jsonStr);
-            const updateRes = directUpdate.apply();
-            if (!updateRes.isError()) {
-              savedDirectly = true;
-              console.log("[bcs_label] ★★★ 後端資料庫直通保存成功 (IOM)！ ★★★");
-            } else {
-              console.warn("[bcs_label] IOM 直通寫入警告：", updateRes.getErrorString());
-            }
-          } catch (saveErr) {
-            console.warn("[bcs_label] IOM 直通寫入異常：", saveErr);
-          }
-        }
-      }
+      // (E) 標準表單生命週期：不在此發送獨立的後台 edit 請求，避免竄改 modified_on 導致 Save 時觸發樂觀鎖衝突 (Unable to Save)
+      // 由原生表單 Save / Done 按鈕統一提交，確保版本完全一致
     }
 
     function renderDropdown(filterQuery) {
