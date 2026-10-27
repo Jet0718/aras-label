@@ -27,6 +27,26 @@
         <data_type>string</data_type>
         <stored_length>128</stored_length>
       </Item>
+
+      <!-- 預設存取權限: Default Access -->
+      <Item type="Allowed Permission" action="add">
+        <is_default>1</is_default>
+        <related_id>
+          <Item type="Permission" action="get">
+            <name>Default Access</name>
+          </Item>
+        </related_id>
+      </Item>
+
+      <!-- 建立實例權限 (Can Add): World -->
+      <Item type="ItemType Can Add" action="add">
+        <can_add>1</can_add>
+        <related_id>
+          <Item type="Identity" action="get">
+            <name>World</name>
+          </Item>
+        </related_id>
+      </Item>
     </Relationships>
   </Item>
 
@@ -53,6 +73,7 @@
         <label xml:lang="en">Label Tags</label>
         <is_relationship>1</is_relationship>
         <is_versionable>0</is_versionable>
+        <use_src_access>1</use_src_access>
         <auto_search>1</auto_search>
         
         <Relationships>
