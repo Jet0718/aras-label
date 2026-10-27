@@ -88,7 +88,12 @@
 提供兩種方式建立此模型：
 
 #### 方式 A：透過 AML 快速匯入（推薦）
-將專案中 `src/aras/aml/bcs_label_ItemType.xml` 複製，在 Aras nash Client 的 **Apply AML** 執行，即可一鍵建立 `bcs_label` ItemType 與 `bcs_label_tags` 關聯。
+在 Aras nash Client 的 **Apply AML** 依序執行以下兩步驟：
+1. **建立模型結構 (Schema)**：
+   複製專案中 `src/aras/aml/bcs_label_ItemType.xml` 內容並執行，建立 `bcs_label` 主表、`bcs_label_tags` 關聯 ItemType 及 `RelationshipType`。
+   *(注意：在 AML 中請勿自行填寫自訂字串 ID，Aras 會自動生成符合規範的 32 碼 Hex GUID)*
+2. **匯入預設範例資料 (Sample Data)**：
+   在模型結構建立完成後，複製 `src/aras/aml/bcs_label_SampleData.xml` 內容執行，建立 `Part_Labels` 目錄與預設的 5 筆彩色標籤。
 
 #### 方式 B：手動介面建立
 1. **建立主表 ItemType**:

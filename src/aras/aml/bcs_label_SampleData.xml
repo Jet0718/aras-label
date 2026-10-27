@@ -1,0 +1,50 @@
+<AML>
+  <!-- 建立範例標籤目錄與彩色標籤項目 (Part_Labels) -->
+  <!-- 請在 bcs_label_ItemType.xml 成功執行建立 ItemType 之後再執行此段 AML -->
+  <Item type="bcs_label" action="add">
+    <name>Part_Labels</name>
+    <description>零件專用彩色標籤群組</description>
+    <Relationships>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>10</sort_id>
+        <name>urgent</name>
+        <label xml:lang="zh-TW">緊急處理</label>
+        <label xml:lang="zh-CN">紧急处理</label>
+        <label xml:lang="en">Urgent Action</label>
+        <color>#EF4444</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>20</sort_id>
+        <name>vip</name>
+        <label xml:lang="zh-TW">VIP重點</label>
+        <label xml:lang="zh-CN">VIP重点</label>
+        <label xml:lang="en">VIP Focus</label>
+        <color>#8B5CF6</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>30</sort_id>
+        <name>design</name>
+        <label xml:lang="zh-TW">設計審查</label>
+        <label xml:lang="zh-CN">设计审查</label>
+        <label xml:lang="en">Design Review</label>
+        <color>#3B82F6</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>40</sort_id>
+        <name>qualified</name>
+        <label xml:lang="zh-TW">合格量產</label>
+        <label xml:lang="zh-CN">合格量产</label>
+        <label xml:lang="en">Qualified</label>
+        <color>#10B981</color>
+      </Item>
+      <Item type="bcs_label_tags" action="add">
+        <sort_id>50</sort_id>
+        <name>obsolete</name>
+        <label xml:lang="zh-TW">停產廢止</label>
+        <label xml:lang="zh-CN">停产废止</label>
+        <label xml:lang="en">Obsolete</label>
+        <color>#6B7280</color>
+      </Item>
+    </Relationships>
+  </Item>
+</AML>

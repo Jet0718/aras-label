@@ -15,6 +15,9 @@
    - `name`: String(32) - 標籤鍵值代碼（Key/ID，不隨語系變動）。
    - `label`: Multilingual String(64) - 支援多語系定義（`ml_string`）。在資料庫與 Client 端依登入語系提供不同語言文字。
    - `color`: Color/String(32) - 標籤徽章背景色（如 `#EF4444`, `#3B82F6`）。
+3. **AML 匯入規範**：
+   - 遵循 Aras Innovator 核心規範，所有 Item 的 `id` 屬性必須為合法的 32 碼十六進位字串（不包含連字號）。在執行 `action="add"` 建立 ItemType/Property 時，不應傳入非 hex 自訂字串，推薦由系統自動分配 GUID。
+   - Schema 定義（ItemType）與資料新增（Item Instance）分段套用，避免同批次執行時遇到快取尚未更新的問題。
 
 ### 1.3 資料儲存格式 (JSON 陣列字串，支援多語系結構)
 在目標 ItemType 的文字屬性欄位中，儲存格式為標準 JSON 陣列字串。
