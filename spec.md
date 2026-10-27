@@ -63,6 +63,8 @@
     1. 取得當前使用者登入語系 (`aras.getSessionContext().getLanguageCode()`)。
     2. 透過 IOM 查詢 `bcs_label` 及其關聯的 `bcs_label_tags`（包含各語系值）。
     3. 讀取屬性透過 `aras.getItemProperty(document.item, propertyName)`（相容 `document.thisItem` 與 XMLNode），寫入屬性則採 `handleItemChange` 搭配 `aras.setItemProperty(document.item, ...)` 雙重同步，確保表單 Dirty 狀態標記與點擊 Save 時能確實寫入資料庫。
+    4. **伺服器主動補查機制 (Auto Re-fetch)**：若 Form 上未放置原生 Text Field，Aras 載入表單時的 SELECT 查詢不會包含 `labels` 節點。當從表單 DOM 讀取為空且 Item 已有 ID 時，自動透過 `aras.applyItem` / IOM 發起查詢補查資料庫真實數值，確保在 View Mode 或解鎖重整時標籤徽章持續正確呈現。
+    5. **後端直通持久化機制 (Direct Persistence)**：在標籤增刪時，除了通知表單骯髒標記，即刻透過 `aras.applyItem("<Item action='edit' version='0'>...")` 直通後端持久化，防止表單生命週期解鎖或重新抓取時因 Form 缺乏 Field 定義而遭遺漏。
   - `MultiLabelController`：調度控制器，統籌上述模組之生命週期與多語系動態切換。
 - **Open/Closed Principle (開放封閉原則)**：
   支援可抽換之 Adapter（正式環境的 `ArasAdapter` 與測試環境的 `MockArasAdapter`），亦可擴充新增其他語系代碼對應。

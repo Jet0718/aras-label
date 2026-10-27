@@ -309,12 +309,19 @@
     // 跨視窗層次尋找 Aras 全域核心物件與 Form Item
     const parentWin = window.parent || window;
     const topWin = window.top || window;
-    const arasObj = window.aras || parentWin.aras || topWin.aras;
+    const arasObj = window.aras || (parentWin && parentWin.aras) || (topWin && topWin.aras);
     const curDoc = window.document;
     const parentDoc = (parentWin && parentWin.document) || curDoc;
-    const itemNode = (curDoc && curDoc.item) || (parentDoc && parentDoc.item) || (topWin.document && topWin.document.item);
+    const itemNode = (curDoc && curDoc.item) || (parentDoc && parentDoc.item) || (topWin.document && topWin.document.item) || topWin.item || (parentWin && parentWin.item);
     const thisItemObj = (curDoc && curDoc.thisItem) || (parentDoc && parentDoc.thisItem);
-    const handleItemChangeFn = window.handleItemChange || parentWin.handleItemChange || topWin.handleItemChange;
+    const handleItemChangeFn = window.handleItemChange || (parentWin && parentWin.handleItemChange) || (topWin && topWin.handleItemChange);
+
+    const currentItemId = (itemNode && itemNode.getAttribute && itemNode.getAttribute("id")) || 
+                          (topWin.item && topWin.item.getAttribute && topWin.item.getAttribute("id")) || 
+                          (parentWin.item && parentWin.item.getAttribute && parentWin.item.getAttribute("id")) || 
+                          (thisItemObj && typeof thisItemObj.getID === "function" && thisItemObj.getID()) || "";
+    const currentItemType = (itemNode && itemNode.getAttribute && itemNode.getAttribute("type")) || 
+                            (thisItemObj && typeof thisItemObj.getType === "function" && thisItemObj.getType()) || "Part";
 
     // 1. 取得當前使用者登入語系
     let currentLang = "zh-TW";
@@ -344,7 +351,7 @@
       isEditMode = true;
     }
 
-    // 3. 讀取現有資料 (多層 Fallback 策略)
+    // 3. 讀取現有資料 (多層 Fallback + IOM 直通後端補查)
     let rawJSON = "";
     try {
       // (A) 優先檢查表單上是否有對應名稱的原生輸入欄位 (隱藏屬性技巧)
@@ -362,6 +369,55 @@
         } else {
           const propNode = itemNode.selectSingleNode ? itemNode.selectSingleNode(propertyName) : itemNode.querySelector(propertyName);
           rawJSON = propNode ? (propNode.text || propNode.textContent || "") : "";
+        }
+      }
+
+      // (B) 終極保證：若從表單 DOM 讀取為空，且已具備項目 ID，直接向伺服器補查資料庫真實欄位值
+      if (!rawJSON && arasObj && currentItemId && (!arasObj.isTemp || !arasObj.isTemp(itemNode))) {
+        // 優先使用原生 applyItem 查詢
+        if (typeof arasObj.applyItem === "function") {
+          try {
+            const qAml = `<Item type="${currentItemType}" action="get" id="${currentItemId}" select="${propertyName}"/>`;
+            const qResXml = arasObj.applyItem(qAml);
+            if (qResXml && !qResXml.includes("<faultcode>")) {
+              const domParser = new DOMParser();
+              const xmlDoc = domParser.parseFromString(qResXml, "text/xml");
+              const propElem = xmlDoc.getElementsByTagName(propertyName)[0];
+              if (propElem) {
+                rawJSON = propElem.textContent || propElem.text || "";
+                if (rawJSON) {
+                  console.log("[bcs_label] 透過伺服器主動補查成功取得資料庫真實值 (applyItem):", rawJSON);
+                }
+              }
+            }
+          } catch (amlErr) {
+            console.warn("[bcs_label] applyItem 補查提示：", amlErr);
+          }
+        }
+
+        // 備用使用 newIOMItem
+        if (!rawJSON && typeof arasObj.newIOMItem === "function") {
+          try {
+            const queryItem = arasObj.newIOMItem(currentItemType, "get");
+            queryItem.setID(currentItemId);
+            queryItem.setAttribute("select", propertyName);
+            const queryRes = queryItem.apply();
+            if (!queryRes.isError()) {
+              rawJSON = queryRes.getProperty(propertyName, "") || "";
+              if (rawJSON) {
+                console.log("[bcs_label] 透過伺服器主動補查成功取得資料庫真實值 (IOM):", rawJSON);
+              }
+            }
+          } catch (qErr) {
+            console.warn("[bcs_label] 伺服器直接補查提示：", qErr);
+          }
+        }
+
+        // 若補查成功，順手回填本地 itemNode，確保後續操作不再缺失
+        if (rawJSON && arasObj && itemNode && typeof arasObj.setItemProperty === "function") {
+          try {
+            arasObj.setItemProperty(itemNode, propertyName, rawJSON);
+          } catch (e) {}
         }
       }
     } catch (err) {
@@ -443,7 +499,7 @@
       });
     }
 
-    // 6. 同步資料至 Aras Form (四重保證機制)
+    // 6. 同步資料至 Aras Form 與後端持久化 (全方位直通儲存架構)
     function syncValue() {
       const jsonStr = store.serializeJSON();
       console.log("[bcs_label] 同步變更至表單 - 欄位:", propertyName, "內容:", jsonStr);
@@ -487,14 +543,54 @@
       }
 
       // (D) 直接向底層 item XMLNode 寫入 property，並標記 edit action
-      if (arasObj && itemNode && typeof arasObj.setItemProperty === "function") {
-        try {
-          arasObj.setItemProperty(itemNode, propertyName, jsonStr);
-          if (!itemNode.getAttribute("action")) {
-            itemNode.setAttribute("action", "edit");
+      const targets = [itemNode, topWin.item, parentWin.item];
+      targets.forEach((target) => {
+        if (arasObj && target && typeof arasObj.setItemProperty === "function") {
+          try {
+            arasObj.setItemProperty(target, propertyName, jsonStr);
+            if (target.getAttribute && !target.getAttribute("action")) {
+              target.setAttribute("action", "edit");
+            }
+          } catch (e) {}
+        }
+      });
+
+      // (E) 關鍵終極保障：直通後端資料庫更新 (即刻持久化寫入，不受客戶端刷新或解除鎖定影響)
+      if (arasObj && currentItemId && (!arasObj.isTemp || !arasObj.isTemp(itemNode))) {
+        let savedDirectly = false;
+        // 優先嘗試使用 Aras 核心原生 applyItem API
+        if (typeof arasObj.applyItem === "function") {
+          try {
+            const aml = `<Item type="${currentItemType}" action="edit" id="${currentItemId}" version="0"><${propertyName}><![CDATA[${jsonStr}]]></${propertyName}></Item>`;
+            const resXml = arasObj.applyItem(aml);
+            if (resXml && !resXml.includes("<faultcode>")) {
+              savedDirectly = true;
+              console.log("[bcs_label] ★★★ 後端資料庫直通保存成功 (applyItem)！ ★★★");
+            } else {
+              console.warn("[bcs_label] applyItem 直通寫入返回：", resXml);
+            }
+          } catch (e) {
+            console.warn("[bcs_label] applyItem 執行異常：", e);
           }
-        } catch (e) {
-          console.warn("[bcs_label] setItemProperty 呼叫提示：", e);
+        }
+
+        // 若 applyItem 未完成，嘗試使用 IOM API
+        if (!savedDirectly && typeof arasObj.newIOMItem === "function") {
+          try {
+            const directUpdate = arasObj.newIOMItem(currentItemType, "edit");
+            directUpdate.setID(currentItemId);
+            directUpdate.setAttribute("version", "0");
+            directUpdate.setProperty(propertyName, jsonStr);
+            const updateRes = directUpdate.apply();
+            if (!updateRes.isError()) {
+              savedDirectly = true;
+              console.log("[bcs_label] ★★★ 後端資料庫直通保存成功 (IOM)！ ★★★");
+            } else {
+              console.warn("[bcs_label] IOM 直通寫入警告：", updateRes.getErrorString());
+            }
+          } catch (saveErr) {
+            console.warn("[bcs_label] IOM 直通寫入異常：", saveErr);
+          }
         }
       }
     }
