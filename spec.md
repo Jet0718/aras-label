@@ -429,4 +429,12 @@ stateDiagram-v2
   </Item>
   ```
 
+### 7.2 C# Server Method 撰寫與編譯規範
+- **Aras Innovator Method Wrapper 機制**：
+  Aras Innovator 伺服器在編譯 C# Method 時，會將 Method 編輯器中的程式碼自動封裝於 `ItemMethod.methodCode()` 內部執行。
+- **程式碼撰寫規範**：
+  1. **無須頂層 `using` 與 `namespace`**：Aras 平台已自動引用 `System`, `System.Collections.Generic`, `Aras.IOM` 等命名空間，在 Method 本體內撰寫頂層 `using` 會被 C# 編譯器視為 `using statement` 宣告而報錯。
+  2. **直接撰寫方法體**：程式碼直接作為方法實體執行，入口直接使用 `this` (當前 Item) 與 `this.getInnovator()`。
+  3. **確保所有路徑均有傳回值**：包含正常流程與例外捕捉區塊，必須確保皆返回 `Item`（如 `return this;` 或 `return inn.newError(...)`）。
+
 
