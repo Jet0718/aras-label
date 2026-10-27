@@ -307,6 +307,7 @@
     const categoryName = config.labelCategoryName || "Part_Labels";
 
     // 跨視窗層次尋找 Aras 全域核心物件與 Form Item
+    // 跨視窗層次尋找 Aras 全域核心物件與 Form Item
     const parentWin = window.parent || window;
     const topWin = window.top || window;
     const arasObj = window.aras || (parentWin && parentWin.aras) || (topWin && topWin.aras);
@@ -317,11 +318,30 @@
     const handleItemChangeFn = window.handleItemChange || (parentWin && parentWin.handleItemChange) || (topWin && topWin.handleItemChange);
 
     const currentItemId = (itemNode && itemNode.getAttribute && itemNode.getAttribute("id")) || 
+                          (window.itemID) || 
+                          (parentWin && parentWin.itemID) || 
+                          (topWin && topWin.itemID) || 
                           (topWin.item && topWin.item.getAttribute && topWin.item.getAttribute("id")) || 
                           (parentWin.item && parentWin.item.getAttribute && parentWin.item.getAttribute("id")) || 
                           (thisItemObj && typeof thisItemObj.getID === "function" && thisItemObj.getID()) || "";
     const currentItemType = (itemNode && itemNode.getAttribute && itemNode.getAttribute("type")) || 
+                            (window.itemTypeName) || 
+                            (parentWin && parentWin.itemTypeName) || 
                             (thisItemObj && typeof thisItemObj.getType === "function" && thisItemObj.getType()) || "Part";
+
+    // 輔助函式：強韌擷取 XML 屬性值 (相容所有命名空間與 CDATA)
+    function extractPropertyValue(sourceXml, prop) {
+      if (!sourceXml) return "";
+      let str = typeof sourceXml === "string" ? sourceXml : (sourceXml.xml || sourceXml.outerHTML || "");
+      if (!str && sourceXml.getElementsByTagName) {
+        const nodes = sourceXml.getElementsByTagName(prop);
+        if (nodes && nodes[0]) return nodes[0].textContent || nodes[0].text || "";
+      }
+      if (!str) return "";
+      const regex = new RegExp("<" + prop + "(?:[^>]*)>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/" + prop + ">", "i");
+      const match = str.match(regex);
+      return match && match[1] ? match[1].trim() : "";
+    }
 
     // 1. 取得當前使用者登入語系
     let currentLang = "zh-TW";
@@ -351,12 +371,12 @@
       isEditMode = true;
     }
 
-    // 3. 讀取現有資料 (多層 Fallback + IOM 直通後端補查)
+    // 3. 讀取現有資料 (多層 Fallback + 伺服器主動補查)
     let rawJSON = "";
     try {
       // (A) 優先檢查表單上是否有對應名稱的原生輸入欄位 (隱藏屬性技巧)
-      const nativeField = (curDoc && (curDoc.getElementsByName(propertyName)[0] || curDoc.querySelector(`[name='${propertyName}']`))) ||
-                          (parentDoc && (parentDoc.getElementsByName(propertyName)[0] || parentDoc.querySelector(`[name='${propertyName}']`)));
+      let nativeField = (curDoc && (curDoc.getElementsByName(propertyName)[0] || curDoc.querySelector(`[name='${propertyName}']`))) ||
+                        (parentDoc && (parentDoc.getElementsByName(propertyName)[0] || parentDoc.querySelector(`[name='${propertyName}']`)));
       if (nativeField && nativeField.value) {
         rawJSON = nativeField.value;
       } else if (arasObj && itemNode && typeof arasObj.getItemProperty === "function") {
@@ -372,26 +392,34 @@
         }
       }
 
+      // 安全判定是否為尚未存檔之暫存新項目
+      let isTempItem = false;
+      try {
+        if (arasObj && itemNode && typeof arasObj.isTemp === "function") {
+          isTempItem = Boolean(arasObj.isTemp(itemNode));
+        }
+      } catch (tErr) {
+        isTempItem = false;
+      }
+
       // (B) 終極保證：若從表單 DOM 讀取為空，且已具備項目 ID，直接向伺服器補查資料庫真實欄位值
-      if (!rawJSON && arasObj && currentItemId && (!arasObj.isTemp || !arasObj.isTemp(itemNode))) {
+      if (!rawJSON && arasObj && currentItemId && !isTempItem) {
+        console.log(`[bcs_label] 偵測到表單未帶出 ${propertyName}，啟動伺服器主動補查 (ID: ${currentItemId}, Type: ${currentItemType})`);
+        
         // 優先使用原生 applyItem 查詢
         if (typeof arasObj.applyItem === "function") {
           try {
             const qAml = `<Item type="${currentItemType}" action="get" id="${currentItemId}" select="${propertyName}"/>`;
-            const qResXml = arasObj.applyItem(qAml);
-            if (qResXml && !qResXml.includes("<faultcode>")) {
-              const domParser = new DOMParser();
-              const xmlDoc = domParser.parseFromString(qResXml, "text/xml");
-              const propElem = xmlDoc.getElementsByTagName(propertyName)[0];
-              if (propElem) {
-                rawJSON = propElem.textContent || propElem.text || "";
-                if (rawJSON) {
-                  console.log("[bcs_label] 透過伺服器主動補查成功取得資料庫真實值 (applyItem):", rawJSON);
-                }
-              }
+            const qRes = arasObj.applyItem(qAml);
+            const extracted = extractPropertyValue(qRes, propertyName);
+            if (extracted) {
+              rawJSON = extracted;
+              console.log("[bcs_label] ★★★ 透過 applyItem 成功補查取得資料庫真實值：", rawJSON);
+            } else {
+              console.log("[bcs_label] applyItem 補查回應中無此欄位內容：", qRes);
             }
           } catch (amlErr) {
-            console.warn("[bcs_label] applyItem 補查提示：", amlErr);
+            console.warn("[bcs_label] applyItem 補查異常：", amlErr);
           }
         }
 
@@ -405,11 +433,13 @@
             if (!queryRes.isError()) {
               rawJSON = queryRes.getProperty(propertyName, "") || "";
               if (rawJSON) {
-                console.log("[bcs_label] 透過伺服器主動補查成功取得資料庫真實值 (IOM):", rawJSON);
+                console.log("[bcs_label] ★★★ 透過 IOM 成功補查取得資料庫真實值：", rawJSON);
               }
+            } else {
+              console.log("[bcs_label] IOM 補查未取得（可能尚無值）：", queryRes.getErrorString());
             }
           } catch (qErr) {
-            console.warn("[bcs_label] 伺服器直接補查提示：", qErr);
+            console.warn("[bcs_label] IOM 補查異常：", qErr);
           }
         }
 
@@ -419,6 +449,26 @@
             arasObj.setItemProperty(itemNode, propertyName, rawJSON);
           } catch (e) {}
         }
+      }
+
+      // (C) 自動在表單中動態注入原生 hidden input 欄位 (確保點擊 Save 時表單收集器能自動抓到)
+      if (!nativeField) {
+        try {
+          const targetForm = (parentDoc && parentDoc.forms && parentDoc.forms[0]) || (curDoc && curDoc.forms && curDoc.forms[0]) || (curDoc && curDoc.body);
+          if (targetForm) {
+            nativeField = curDoc.createElement("input");
+            nativeField.type = "hidden";
+            nativeField.name = propertyName;
+            nativeField.id = "bcs_hidden_" + propertyName;
+            nativeField.value = rawJSON;
+            targetForm.appendChild(nativeField);
+            console.log("[bcs_label] 已動態注入表單原生 hidden 欄位，打通 Save 收集通道！");
+          }
+        } catch (injectErr) {
+          console.warn("[bcs_label] 動態注入 hidden 欄位提示：", injectErr);
+        }
+      } else {
+        nativeField.value = rawJSON;
       }
     } catch (err) {
       console.warn("[bcs_label] 讀取屬性失敗：", err);
@@ -556,18 +606,19 @@
       });
 
       // (E) 關鍵終極保障：直通後端資料庫更新 (即刻持久化寫入，不受客戶端刷新或解除鎖定影響)
-      if (arasObj && currentItemId && (!arasObj.isTemp || !arasObj.isTemp(itemNode))) {
+      if (arasObj && currentItemId && !isTempItem) {
         let savedDirectly = false;
         // 優先嘗試使用 Aras 核心原生 applyItem API
         if (typeof arasObj.applyItem === "function") {
           try {
             const aml = `<Item type="${currentItemType}" action="edit" id="${currentItemId}" version="0"><${propertyName}><![CDATA[${jsonStr}]]></${propertyName}></Item>`;
             const resXml = arasObj.applyItem(aml);
+            console.log("[bcs_label] applyItem 直通寫入伺服器回應：", resXml);
             if (resXml && !resXml.includes("<faultcode>")) {
               savedDirectly = true;
               console.log("[bcs_label] ★★★ 後端資料庫直通保存成功 (applyItem)！ ★★★");
             } else {
-              console.warn("[bcs_label] applyItem 直通寫入返回：", resXml);
+              console.warn("[bcs_label] applyItem 直通寫入警告/錯誤：", resXml);
             }
           } catch (e) {
             console.warn("[bcs_label] applyItem 執行異常：", e);
