@@ -1,24 +1,10 @@
-// @ts-nocheck
-/**
- * @file bcs_main_grid_extension.js
- * @description Aras Innovator R36 Main Grid 多標籤彩色徽章渲染與搜尋列選擇器組件
- * 
- * 功能特點：
- * 1. 【網格彩化】：自動將 Main Grid 列表中「標記 (labels)」欄位的生硬 JSON 字串解析並渲染為美觀的彩色徽章 (Chips)。
- * 2. 【搜尋選擇器】：在搜尋列的「標記」輸入框掛載互動式標籤挑選彈窗 (Popover)，支援多選標籤與 AND/OR 條件切換。
- * 3. 【後端聯動】：選取標籤後自動填入搜尋條件並觸發搜尋，無縫對接後端 bcs_label_search_handler (onBeforeGet) 轉譯。
- * 4. 【多環境相容】：支援作為 CUI Init Method、Action 或全域注入執行。
- */
+// Aras Innovator R36 Main Grid 多標籤彩色徽章渲染與搜尋列選擇器組件
+// 功能：跨 iframe 尋找主網格，將生硬的 labels JSON 轉換為彩色徽章，並掛載搜尋選擇器
 
 (function () {
-  if (window._bcs_main_grid_extension_initialized) {
-    return;
-  }
-  window._bcs_main_grid_extension_initialized = true;
+  console.log("[bcs_label_grid] 正在啟動 Aras Main Grid 多標籤增強擴充模組 (跨 frame 掃描版)...");
 
-  console.log("[bcs_label_grid] 正在啟動 Aras Main Grid 多標籤增強擴充模組...");
-
-  /** @type {any} */
+  // 取得 Aras 核心全域物件 (相容當前視窗、父視窗與頂層視窗)
   const arasObj = window.aras || (window.parent && window.parent.aras) || (window.top && window.top.aras);
 
   // 1. 取得當前使用者登入語系
@@ -29,14 +15,15 @@
     } else if (arasObj && typeof arasObj.getLanguageCode === "function") {
       currentLang = arasObj.getLanguageCode() || "zh-TW";
     }
-  } catch (e) {
+  } catch (errLang) {
     currentLang = "zh-TW";
   }
 
-  // 2. 注入自訂 CSS 樣式
-  function injectStyles() {
-    if (document.getElementById("bcs_main_grid_styles")) return;
-    const styleEl = document.createElement("style");
+  // 2. 注入自訂 CSS 樣式至指定 Document
+  function injectStyles(targetDoc) {
+    const doc = targetDoc || document;
+    if (!doc || !doc.head || doc.getElementById("bcs_main_grid_styles")) return;
+    const styleEl = doc.createElement("style");
     styleEl.id = "bcs_main_grid_styles";
     styleEl.textContent = `
       /* Grid 單元格彩色標籤徽章 */
@@ -208,11 +195,10 @@
         opacity: 0.9;
       }
     `;
-    document.head.appendChild(styleEl);
+    doc.head.appendChild(styleEl);
   }
 
   // 3. 取得標籤目錄 (bcs_label_tags)
-  /** @type {Array<{name: string, label: string, color: string, sort_id: number}>} */
   let availableTags = [];
   function loadAvailableTags() {
     if (!arasObj || typeof arasObj.newIOMItem !== "function") return;
@@ -237,17 +223,13 @@
           availableTags.push({ name, label, color, sort_id });
         }
       }
-    } catch (e) {
-      console.warn("[bcs_label_grid] 載入標籤目錄失敗：", e);
+    } catch (errTags) {
+      console.warn("[bcs_label_grid] 載入標籤目錄失敗：", errTags);
     }
   }
 
-  /**
-   * 計算高對比文字顏色 (深底配白字，淺底配深字)
-   * @param {string} hexColor - 十六進制顏色碼
-   * @returns {string} 高對比前景色
-   */
-  function getContrastColor(hexColor) {
+  // 4. 計算高對比文字顏色 (深底配白字，淺底配深字)
+  function getContrastColor(hexColor = "") {
     if (!hexColor || typeof hexColor !== "string") return "#FFFFFF";
     const clean = hexColor.replace("#", "");
     const r = parseInt(clean.substring(0, 2), 16) || 0;
@@ -257,11 +239,8 @@
     return yiq >= 150 ? "#1E293B" : "#FFFFFF";
   }
 
-  /**
-   * 格式化單一單元格的 JSON 內容為彩色徽章 (Chips)
-   * @param {HTMLElement} cellEl - 網格單元格元素
-   */
-  function formatCellElement(cellEl) {
+  // 5. 格式化單一單元格的 JSON 內容為彩色徽章 (Chips)
+  function formatCellElement(cellEl = null, targetDoc = document) {
     if (!cellEl || cellEl.dataset.bcsFormatted === "true") return;
     const text = (cellEl.textContent || "").trim();
     if (!text.startsWith("[") || !text.includes('"name":')) return;
@@ -270,53 +249,53 @@
       const arr = JSON.parse(text);
       if (!Array.isArray(arr) || arr.length === 0) return;
 
-      const container = document.createElement("div");
+      const container = targetDoc.createElement("div");
       container.className = "bcs-grid-tags-cell";
 
-      arr.forEach((tag) => {
+      for (let i = 0; i < arr.length; i++) {
+        const tag = arr[i];
         let displayLabel = tag.label || tag.name;
         if (tag.labels && typeof tag.labels === "object") {
           displayLabel = tag.labels[currentLang] || tag.labels["default"] || displayLabel;
         }
-        const badge = document.createElement("span");
+        const badge = targetDoc.createElement("span");
         badge.className = "bcs-grid-tag-badge";
         badge.style.backgroundColor = tag.color || "#3B82F6";
         badge.style.color = getContrastColor(tag.color);
         badge.title = tag.name;
         badge.textContent = displayLabel;
         container.appendChild(badge);
-      });
+      }
 
       cellEl.innerHTML = "";
       cellEl.appendChild(container);
       cellEl.dataset.bcsFormatted = "true";
-    } catch (e) {}
+    } catch (errJson) {}
   }
 
-  // 6. 掃描並彩化當前網格所有單元格
-  function formatGridRows() {
-    const cells = document.querySelectorAll(".aras-grid-row-cell, td[role='gridcell'], div[role='gridcell']");
-    cells.forEach((cell) => {
-      formatCellElement(/** @type {HTMLElement} */ (cell));
-    });
+  // 6. 掃描並彩化指定 Document 中所有單元格
+  function formatGridRows(targetDoc) {
+    const doc = targetDoc || document;
+    if (!doc) return 0;
+    const cells = doc.querySelectorAll(".aras-grid-row-cell, td[role='gridcell'], div[role='gridcell']");
+    let count = 0;
+    for (let i = 0; i < cells.length; i++) {
+      formatCellElement(cells[i], doc);
+      count++;
+    }
+    return count;
   }
 
   // 7. 搜尋列標籤挑選面板 (Search Picker Popover)
-  /** @type {HTMLElement|null} */
   let activePopover = null;
+  function createSearchPopover(inputEl = null, targetDoc = document) {
+    if (!inputEl) return null;
+    if (inputEl._bcsPopover) return inputEl._bcsPopover;
 
-  /**
-   * 建立或取得搜尋列 Popover 控制器
-   * @param {HTMLInputElement} inputEl - 搜尋列輸入框
-   * @returns {{open: Function, close: Function}} 控制器介面
-   */
-  function createSearchPopover(inputEl) {
-    if (/** @type {any} */ (inputEl)._bcsPopover) return /** @type {any} */ (inputEl)._bcsPopover;
-
-    const popover = document.createElement("div");
+    const doc = targetDoc || document;
+    const popover = doc.createElement("div");
     popover.className = "bcs-search-popover";
     let matchMode = "AND";
-    /** @type {Set<string>} */
     const selectedKeys = new Set();
 
     // 建立浮層內部結構
@@ -334,23 +313,26 @@
         <button type="button" class="bcs-popover-action-btn apply">套用搜尋</button>
       </div>
     `;
-    document.body.appendChild(popover);
+    doc.body.appendChild(popover);
 
     const listEl = popover.querySelector(".bcs-popover-list");
     const modeBtns = popover.querySelectorAll(".bcs-mode-btn");
     const clearBtn = popover.querySelector(".clear");
     const applyBtn = popover.querySelector(".apply");
 
-    // 模式切換
-    modeBtns.forEach((btn) => {
-      /** @param {MouseEvent} e */
-      btn.onclick = function (e) {
-        if (e && typeof e.stopPropagation === "function") e.stopPropagation();
-        modeBtns.forEach((b) => b.classList.remove("is-active"));
+    // 模式切換按鈕事件
+    for (let m = 0; m < modeBtns.length; m++) {
+      const btn = modeBtns[m];
+      btn.onclick = function () {
+        const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+        if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
+        for (let b = 0; b < modeBtns.length; b++) {
+          modeBtns[b].classList.remove("is-active");
+        }
         btn.classList.add("is-active");
-        matchMode = (btn instanceof HTMLElement && btn.dataset.mode) ? btn.dataset.mode : "AND";
+        matchMode = btn.getAttribute("data-mode") || "AND";
       };
-    });
+    }
 
     // 渲染可用標籤列表
     function renderList() {
@@ -360,8 +342,9 @@
         listEl.innerHTML = '<div style="padding:10px;text-align:center;font-size:11px;color:#94A3B8;">無可用標籤定義</div>';
         return;
       }
-      availableTags.forEach((tag) => {
-        const itemEl = document.createElement("div");
+      for (let i = 0; i < availableTags.length; i++) {
+        const tag = availableTags[i];
+        const itemEl = doc.createElement("div");
         itemEl.className = "bcs-popover-item";
         const isChecked = selectedKeys.has(tag.name);
         if (isChecked) itemEl.classList.add("is-selected");
@@ -373,12 +356,12 @@
           </span>
         `;
 
-        /** @param {MouseEvent} e */
-        itemEl.onclick = function (e) {
-          if (e && typeof e.stopPropagation === "function") e.stopPropagation();
+        itemEl.onclick = function () {
+          const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+          if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
           const checkbox = itemEl.querySelector(".bcs-popover-checkbox");
           if (!checkbox) return;
-          const nextChecked = e.target !== checkbox ? !checkbox.checked : checkbox.checked;
+          const nextChecked = (evt && evt.target !== checkbox) ? !checkbox.checked : checkbox.checked;
           checkbox.checked = nextChecked;
           if (nextChecked) {
             selectedKeys.add(tag.name);
@@ -390,14 +373,14 @@
         };
 
         listEl.appendChild(itemEl);
-      });
+      }
     }
 
     // 清空操作
     if (clearBtn) {
-      /** @param {MouseEvent} e */
-      clearBtn.onclick = function (e) {
-        if (e && typeof e.stopPropagation === "function") e.stopPropagation();
+      clearBtn.onclick = function () {
+        const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+        if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
         selectedKeys.clear();
         renderList();
         inputEl.value = "";
@@ -409,16 +392,16 @@
 
     // 套用搜尋
     if (applyBtn) {
-      /** @param {MouseEvent} e */
-      applyBtn.onclick = function (e) {
-        if (e && typeof e.stopPropagation === "function") e.stopPropagation();
-        /** @type {string[]} */
+      applyBtn.onclick = function () {
+        const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+        if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
         const chosenLabels = [];
-        availableTags.forEach((t) => {
+        for (let i = 0; i < availableTags.length; i++) {
+          const t = availableTags[i];
           if (selectedKeys.has(t.name)) {
             chosenLabels.push(t.label || t.name);
           }
-        });
+        }
 
         const criteriaText = chosenLabels.join(matchMode === "OR" ? " | " : ",");
         inputEl.value = criteriaText;
@@ -428,11 +411,14 @@
 
         // 自動觸發 Aras 主搜尋工具列的 Search 按鈕
         setTimeout(() => {
-          const searchBtn = document.querySelector(".aras-button[data-id='search'], button[title='Search'], button[aria-label='Search']");
+          const searchBtn = doc.querySelector(".aras-button[data-id='search'], button[title='Search'], button[aria-label='Search']");
           if (searchBtn && typeof searchBtn.click === "function") {
             searchBtn.click();
-          } else if (typeof window.onSearchCommand === "function") {
-            window.onSearchCommand();
+          } else {
+            const win = doc.defaultView || window;
+            if (win && typeof win.onSearchCommand === "function") {
+              win.onSearchCommand();
+            }
           }
         }, 100);
       };
@@ -447,8 +433,8 @@
       renderList();
 
       const rect = inputEl.getBoundingClientRect();
-      popover.style.top = `${rect.bottom + 4}px`;
-      popover.style.left = `${rect.left}px`;
+      popover.style.top = (rect.bottom + 4) + "px";
+      popover.style.left = rect.left + "px";
       popover.classList.add("is-open");
     }
 
@@ -457,63 +443,68 @@
       if (activePopover === popover) activePopover = null;
     }
 
-    /** @param {MouseEvent} e */
-    document.addEventListener("mousedown", function (e) {
-      const targetNode = /** @type {Node} */ (e.target);
-      if (!popover.contains(targetNode) && targetNode !== inputEl && !(targetNode instanceof Element && targetNode.closest(".bcs-search-picker-btn"))) {
+    doc.addEventListener("mousedown", function () {
+      const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+      if (!evt) return;
+      const targetNode = evt.target;
+      if (!popover.contains(targetNode) && targetNode !== inputEl && !(targetNode.closest && targetNode.closest(".bcs-search-picker-btn"))) {
         closePopover();
       }
     });
 
     const handler = { open: openPopover, close: closePopover };
-    /** @type {any} */ (inputEl)._bcsPopover = handler;
+    inputEl._bcsPopover = handler;
     return handler;
   }
 
   // 8. 掛載搜尋列標籤輸入框
-  function attachSearchInput() {
-    // 尋找「標記」或「labels」欄位對應的搜尋輸入框
-    const inputs = document.querySelectorAll(".aras-grid-search-row-cell input, tr.aras-grid-search-row input, .aras-grid-search-cell input");
-    inputs.forEach((inputNode) => {
-      const input = /** @type {HTMLInputElement} */ (inputNode);
-      if (/** @type {any} */ (input)._bcsSearchAttached) return;
+  function attachSearchInput(targetDoc, targetWin) {
+    const doc = targetDoc || document;
+    if (!doc) return 0;
+    const inputs = doc.querySelectorAll(".aras-grid-search-row-cell input, tr.aras-grid-search-row input, .aras-grid-search-cell input");
+    let attachedCount = 0;
+
+    for (let i = 0; i < inputs.length; i++) {
+      const input = inputs[i];
+      if (input._bcsSearchAttached) continue;
 
       // 檢查是否為 labels 欄位 (透過 placeholder, name 或父層表頭識別)
       const parentCell = input.closest("td, th, div[role='gridcell']");
       const colIndex = parentCell ? parentCell.getAttribute("data-index") : null;
 
-      // 尋找表頭文字是否包含「標記」或「labels」
       let isLabelsCol = false;
-      const headers = document.querySelectorAll(".aras-grid-header-cell, th[role='columnheader']");
-      headers.forEach((th) => {
+      const headers = doc.querySelectorAll(".aras-grid-header-cell, th[role='columnheader']");
+      for (let h = 0; h < headers.length; h++) {
+        const th = headers[h];
         if (colIndex && th.getAttribute("data-index") === colIndex) {
           if (th.textContent && (th.textContent.includes("標記") || th.textContent.includes("labels"))) {
             isLabelsCol = true;
+            break;
           }
         } else if (th.textContent && (th.textContent.includes("標記") || th.textContent.includes("labels"))) {
-          // 若無精確 index，檢測水平位置相近度
           const thRect = th.getBoundingClientRect();
           const inRect = input.getBoundingClientRect();
           if (Math.abs(thRect.left - inRect.left) < 30) {
             isLabelsCol = true;
+            break;
           }
         }
-      });
+      }
 
       if (isLabelsCol) {
-        /** @type {any} */ (input)._bcsSearchAttached = true;
+        input._bcsSearchAttached = true;
         input.placeholder = "點擊挑選標籤...";
         input.style.paddingRight = "24px";
 
         // 在輸入框右側掛載標籤小圖示按鈕
-        const wrapper = document.createElement("div");
+        const wrapper = doc.createElement("div");
         wrapper.className = "bcs-search-wrapper";
         if (input.parentNode) {
           input.parentNode.insertBefore(wrapper, input);
           wrapper.appendChild(input);
         }
 
-        const btn = document.createElement("button");
+        const btn = doc.createElement("button");
         btn.type = "button";
         btn.className = "bcs-search-picker-btn";
         btn.title = "點選標籤篩選";
@@ -521,46 +512,102 @@
 
         wrapper.appendChild(btn);
 
-        const popoverHandler = createSearchPopover(input);
-        /** @param {MouseEvent} e */
-        btn.onclick = function (e) {
-          if (e && typeof e.preventDefault === "function") e.preventDefault();
-          if (e && typeof e.stopPropagation === "function") e.stopPropagation();
-          popoverHandler.open();
+        const popoverHandler = createSearchPopover(input, doc);
+        btn.onclick = function () {
+          const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+          if (evt && typeof evt.preventDefault === "function") evt.preventDefault();
+          if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
+          if (popoverHandler) popoverHandler.open();
         };
-        /** @param {MouseEvent} e */
-        input.onclick = function (e) {
-          if (e && typeof e.stopPropagation === "function") e.stopPropagation();
-          popoverHandler.open();
+        input.onclick = function () {
+          const evt = window.event || (arguments.length > 0 ? arguments[0] : null);
+          if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
+          if (popoverHandler) popoverHandler.open();
         };
         input.onfocus = function () {
-          popoverHandler.open();
+          if (popoverHandler) popoverHandler.open();
         };
+
+        attachedCount++;
       }
-    });
+    }
+
+    return attachedCount;
   }
 
-  // 9. 啟動觀察器與週期掃描
-  injectStyles();
+  // 9. 核心：遞迴收集全域所有 iframe 視窗
+  function getAllFrames(rootWin) {
+    const list = [];
+    function scan(w) {
+      if (!w) return;
+      try {
+        list.push(w);
+        if (w.frames && w.frames.length > 0) {
+          for (let f = 0; f < w.frames.length; f++) {
+            try {
+              scan(w.frames[f]);
+            } catch (errFrame) {}
+          }
+        }
+      } catch (errWin) {}
+    }
+    scan(rootWin || window.top || window);
+    return list;
+  }
+
+  // 10. 對單一 Grid 視窗進行彩化與監控
+  function enhanceWindow(w) {
+    if (!w || !w.document) return false;
+    const doc = w.document;
+    const hasGrid = doc.querySelector(".aras-grid") || doc.querySelector(".aras-grid-row-cell") || doc.querySelector(".aras-grid-search-row-cell") || w.grid;
+    if (!hasGrid) return false;
+
+    injectStyles(doc);
+    formatGridRows(doc);
+    attachSearchInput(doc, w);
+
+    if (!doc._bcsObserverBound && doc.body) {
+      doc._bcsObserverBound = true;
+      const obs = new MutationObserver(function () {
+        formatGridRows(doc);
+        attachSearchInput(doc, w);
+      });
+      obs.observe(doc.body, { childList: true, subtree: true });
+    }
+
+    return true;
+  }
+
+  // 11. 全域掃描與套用
   loadAvailableTags();
+  const allWindows = getAllFrames(window.top || window);
+  let enhancedGridCount = 0;
 
-  // 初次執行
-  setTimeout(() => {
-    formatGridRows();
-    attachSearchInput();
-  }, 300);
+  for (let w = 0; w < allWindows.length; w++) {
+    try {
+      if (enhanceWindow(allWindows[w])) {
+        enhancedGridCount++;
+      }
+    } catch (errEnhance) {}
+  }
 
-  // 使用 MutationObserver 持續監聽 Grid DOM 變化 (翻頁、搜尋、捲動)
-  const observer = new MutationObserver(() => {
-    formatGridRows();
-    attachSearchInput();
-  });
+  console.log("[bcs_label_grid] 掃描完成，已對 " + enhancedGridCount + " 個 Grid 畫面完成彩化與掛載！");
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  // 若由 Action 點擊觸發，彈出成功提示
+  if (arasObj && typeof arasObj.AlertSuccess === "function") {
+    arasObj.AlertSuccess("標記彩化與搜尋選擇器已成功啟用！已套用至 " + enhancedGridCount + " 個視窗。");
+  }
 
-  console.log("[bcs_label_grid] Aras Main Grid 多標籤增強擴充模組啟動成功！");
+  // 在頂層 window.top 啟動全域守護定時器 (確保切換分頁或新開搜尋時持續生效)
+  const topWin = window.top || window;
+  if (!topWin._bcs_global_grid_daemon) {
+    topWin._bcs_global_grid_daemon = setInterval(function () {
+      const currentFrames = getAllFrames(topWin);
+      for (let k = 0; k < currentFrames.length; k++) {
+        try {
+          enhanceWindow(currentFrames[k]);
+        } catch (e) {}
+      }
+    }, 1200);
+  }
 })();
-
