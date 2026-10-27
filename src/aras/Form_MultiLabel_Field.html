@@ -329,6 +329,15 @@
                             (parentWin && parentWin.itemTypeName) || 
                             (thisItemObj && typeof thisItemObj.getType === "function" && thisItemObj.getType()) || "Part";
 
+    // 探測 Part ItemType 實際擁有的 label 相關屬性名稱，協助驗證欄位命名
+    try {
+      if (arasObj && typeof arasObj.applyItem === "function") {
+        const checkPropAml = `<Item type="Property" action="get" select="name,label,data_type"><source_id><Item type="ItemType" action="get"><name>${currentItemType}</name></Item></source_id><name condition="like">%label%</name></Item>`;
+        const checkRes = arasObj.applyItem(checkPropAml);
+        console.log(`[bcs_label] 系統探測 ${currentItemType} 屬性定義結果：`, checkRes);
+      }
+    } catch (e) {}
+
     // 安全判定是否為尚未存檔之暫存新項目 (全域共用變數，防範 ReferenceError)
     let isTempItem = false;
     try {
@@ -712,26 +721,6 @@
     }
 
     renderBadges();
-
-    // 7. 掛載 Save / Unlock 事件攔截器 (保證在點擊 Save/Done 存檔時強制把 labels 一同打包)
-    try {
-      ["onSaveCommand", "onUnlockCommand", "onSaveUnlockAndExitCommand"].forEach((cmdName) => {
-        const targets = [window, parentWin, topWin];
-        targets.forEach((winObj) => {
-          if (winObj && typeof winObj[cmdName] === "function" && !winObj["_bcs_" + cmdName + "_hooked"]) {
-            winObj["_bcs_" + cmdName + "_hooked"] = true;
-            const origCmd = winObj[cmdName];
-            winObj[cmdName] = function() {
-              console.log("[bcs_label] 偵測到表單執行 " + cmdName + " 命令，強制注入最新標籤...");
-              syncValue();
-              return origCmd.apply(this, arguments);
-            };
-          }
-        });
-      });
-    } catch (hErr) {
-      console.warn("[bcs_label] 掛載 Save 攔截器提示：", hErr);
-    }
   };
 })(window);
 </script>
