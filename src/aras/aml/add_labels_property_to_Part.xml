@@ -1,0 +1,12 @@
+<AML>
+  <!-- 在 Part ItemType (GUID: 4F1AC04A2B484F3ABA4E20DB63808A88) 自動新增 labels (Text 型態) 屬性 -->
+  <Item type="Property" action="add">
+    <source_id>4F1AC04A2B484F3ABA4E20DB63808A88</source_id>
+    <name>labels</name>
+    <label xml:lang="zh-TW">標記</label>
+    <label xml:lang="en">Labels</label>
+    <data_type>text</data_type>
+    <is_hidden>0</is_hidden>
+    <is_hidden2>0</is_hidden2>
+  </Item>
+</AML>

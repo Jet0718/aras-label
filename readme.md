@@ -113,12 +113,31 @@
 
 ### 步驟 2：在目標 ItemType 建立文字欄位
 在需要使用標籤的 ItemType（例如 `Part` 或自訂 ItemType）：
-1. 進入 ItemType Properties 頁籤。
-2. 新增屬性：
+
+#### 方式 A：透過 AML 快速建立（最推薦，5 秒完成）
+在 Aras nash Client 的 **Apply AML** 貼入並執行 `src/aras/aml/add_labels_property_to_Part.xml`：
+```xml
+<AML>
+  <Item type="Property" action="add">
+    <source_id>4F1AC04A2B484F3ABA4E20DB63808A88</source_id>
+    <name>labels</name>
+    <label xml:lang="zh-TW">標記</label>
+    <label xml:lang="en">Labels</label>
+    <data_type>text</data_type>
+    <is_hidden>0</is_hidden>
+    <is_hidden2>0</is_hidden2>
+  </Item>
+</AML>
+```
+
+#### 方式 B：手動介面建立
+1. 進入 **Administration > ItemTypes**，搜尋並開啟 `Part`。
+2. 點擊 **Edit** 鎖定。
+3. 切換至 **Properties** 頁籤，新增一列：
    - **Name**: `labels`
-   - **Label**: `標籤`
-   - **Data Type**: `String`（長度建議設為 `2048` 或以上）或 `Text`。
-3. 儲存 ItemType。
+   - **Label**: `標記`
+   - **Data Type**: `Text`
+4. 點擊 **Save** 並 **Done** 解鎖 ItemType。
 
 ### 步驟 3：在 Form 放置隱藏原生欄位與 HTML Field（隱藏屬性綁定技巧）
 > [!IMPORTANT]
