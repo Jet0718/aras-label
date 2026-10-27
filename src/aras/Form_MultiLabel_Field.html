@@ -329,6 +329,16 @@
                             (parentWin && parentWin.itemTypeName) || 
                             (thisItemObj && typeof thisItemObj.getType === "function" && thisItemObj.getType()) || "Part";
 
+    // 安全判定是否為尚未存檔之暫存新項目 (全域共用變數，防範 ReferenceError)
+    let isTempItem = false;
+    try {
+      if (arasObj && itemNode && typeof arasObj.isTemp === "function") {
+        isTempItem = Boolean(arasObj.isTemp(itemNode));
+      }
+    } catch (tErr) {
+      isTempItem = false;
+    }
+
     // 輔助函式：強韌擷取 XML 屬性值 (相容所有命名空間與 CDATA)
     function extractPropertyValue(sourceXml, prop) {
       if (!sourceXml) return "";
@@ -392,16 +402,6 @@
         }
       }
 
-      // 安全判定是否為尚未存檔之暫存新項目
-      let isTempItem = false;
-      try {
-        if (arasObj && itemNode && typeof arasObj.isTemp === "function") {
-          isTempItem = Boolean(arasObj.isTemp(itemNode));
-        }
-      } catch (tErr) {
-        isTempItem = false;
-      }
-
       // (B) 終極保證：若從表單 DOM 讀取為空，且已具備項目 ID，直接向伺服器補查資料庫真實欄位值
       if (!rawJSON && arasObj && currentItemId && !isTempItem) {
         console.log(`[bcs_label] 偵測到表單未帶出 ${propertyName}，啟動伺服器主動補查 (ID: ${currentItemId}, Type: ${currentItemType})`);
@@ -443,11 +443,15 @@
           }
         }
 
-        // 若補查成功，順手回填本地 itemNode，確保後續操作不再缺失
+        // 若補查成功，順手回填本地 itemNode 並即刻更新 UI
         if (rawJSON && arasObj && itemNode && typeof arasObj.setItemProperty === "function") {
           try {
             arasObj.setItemProperty(itemNode, propertyName, rawJSON);
           } catch (e) {}
+        }
+        if (rawJSON) {
+          store.deserializeJSON(rawJSON);
+          renderBadges();
         }
       }
 
@@ -708,6 +712,26 @@
     }
 
     renderBadges();
+
+    // 7. 掛載 Save / Unlock 事件攔截器 (保證在點擊 Save/Done 存檔時強制把 labels 一同打包)
+    try {
+      ["onSaveCommand", "onUnlockCommand", "onSaveUnlockAndExitCommand"].forEach((cmdName) => {
+        const targets = [window, parentWin, topWin];
+        targets.forEach((winObj) => {
+          if (winObj && typeof winObj[cmdName] === "function" && !winObj["_bcs_" + cmdName + "_hooked"]) {
+            winObj["_bcs_" + cmdName + "_hooked"] = true;
+            const origCmd = winObj[cmdName];
+            winObj[cmdName] = function() {
+              console.log("[bcs_label] 偵測到表單執行 " + cmdName + " 命令，強制注入最新標籤...");
+              syncValue();
+              return origCmd.apply(this, arguments);
+            };
+          }
+        });
+      });
+    } catch (hErr) {
+      console.warn("[bcs_label] 掛載 Save 攔截器提示：", hErr);
+    }
   };
 })(window);
 </script>
