@@ -52,7 +52,27 @@
   1. Map / Object 迭代時若僅需 value，一律使用 `for (const val of map.values())`，避免解構出無用之 key 變數。
   2. 迴圈或狀態判斷直接使用 `break` 或即時回傳，嚴禁聲明後續未被讀取引用的冗餘旗標變數。
 
-### 4. Grid 搜尋列 (Search Row) DOM 防破壞與防裁切原則
+### 4. HyperGrid (Inferno.js) Virtual DOM 零破壞與防錯位守則 (Anti-InsertBefore-Error)
+- **問題現象**：
+  拖拉欄寬或更換欄位順序時，Console 噴發：
+  `NotFoundError: Failed to execute 'insertBefore' on 'Node': The node before which the new node is to be inserted is not a child of this node.`
+  且單元格錯位（例如 `State` 欄位被彩色標籤徽章覆蓋）。
+- **根本原因**：
+  Aras R36 主網格採用 HyperGrid (基於 Inferno.js Virtual DOM)，具備 DOM 節點重用機制。若使用 `cellEl.innerHTML = ""` 或刪除節點，會摧毀 Virtual DOM 內部追蹤的原生子節點。當欄位重用時，Inferno 的 `insertBefore(newNode, oldNode)` 找不到 `oldNode` 即崩潰，導致單元格未被重繪，殘留上次的徽章並污染非標籤欄位。
+- **標準解法**：
+  1. **零破壞渲染 (Zero-Destruction)**：嚴禁清空單元格子節點！原生 TextNode 保留在 DOM 樹內供 diffing 比對，原生文字改以 CSS `font-size: 0 !important; color: transparent !important;` 隱藏。
+  2. **獨立疊加徽章層**：彩色徽章容器 `.bcs-grid-tags-cell` 採絕對定位覆蓋於單元格之上。
+  3. **欄位特徵檢驗**：非標籤欄位（如 State）若帶有殘留徽章，立即安全清除並還原文字。
+
+### 5. 純淨 TextNode 防污染守則 (Anti-Contamination-Text-Extraction)
+- **問題現象**：
+  反覆更換搜尋條件時，後端搜尋正確（例如搜出含有 VIP重點 的唯一零件），但畫面上該列的標籤依然顯示為上一次搜尋留下的「緊急處理」「設計審查」。
+- **根本原因**：
+  使用 `cellEl.textContent` 讀取資料時，瀏覽器會將原生 TextNode 與先前追加的徽章容器內部的文字全部拼接在一起（如 `[{"name":"vip"...}]緊急處理設計審查`）。導致切換資料行時 `JSON.parse` 拋出語法例外中斷，徽章永遠無法更新。
+- **標準解法**：
+  遍歷 `cellEl.childNodes`，僅提取純粹的 TextNode (nodeType === 3)，徹底排除 `.bcs-grid-tags-cell` 的干擾，確保反覆搜尋時 JSON 解析 100% 準確無誤。
+
+### 6. Grid 搜尋列 (Search Row) DOM 防破壞與防裁切原則
 - **問題現象**：
   直接包裝搜尋列 input 或在格子內掛載彈跳選單時，彈窗被截斷看不見，或者 Grid 重繪時 input 遺失跑版。
 - **根本原因**：
