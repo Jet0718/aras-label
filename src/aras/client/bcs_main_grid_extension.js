@@ -12,6 +12,7 @@
  *   - 非侵入式 DOM 掛載：絕不破壞 Aras Grid 的原生 DOM 結構與虛擬滾動 (Virtual Scroll)。
  *   - 防裁切定位：Popover 節點獨立掛載於頂層 body，採 position: fixed，徹底解決 overflow 裁切問題。
  *   - 三重容錯欄位偵測：結合表頭文字、DOM 屬性與資料列 JSON 特徵，百分之百鎖定標籤欄位。
+ *   - 嚴格型別預設值：消除 Aras Monaco/TypeScript linter 的 noImplicitAny 提示。
  */
 
 (function () {
@@ -32,8 +33,11 @@
     currentLang = "zh-TW";
   }
 
-  // 2. 注入自訂現代化 CSS 樣式至指定 Document
-  function injectStyles(targetDoc) {
+  /**
+   * 2. 注入自訂現代化 CSS 樣式至指定 Document
+   * @param {Document|null} [targetDoc=null] - 目標文檔物件
+   */
+  function injectStyles(targetDoc = null) {
     const doc = targetDoc || document;
     if (!doc || !doc.head || doc.getElementById("bcs_main_grid_styles")) return;
     const styleEl = doc.createElement("style");
@@ -269,8 +273,12 @@
     }
   }
 
-  // 4. 計算高對比文字顏色 (深底配白字，淺底配深字)
-  function getContrastColor(hexColor) {
+  /**
+   * 4. 計算高對比文字顏色 (深底配白字，淺底配深字)
+   * @param {string} [hexColor=""] - 十六進制色彩碼
+   * @returns {string} 高對比文字色
+   */
+  function getContrastColor(hexColor = "") {
     if (!hexColor || typeof hexColor !== "string") return "#FFFFFF";
     const clean = hexColor.replace("#", "");
     const r = parseInt(clean.substring(0, 2), 16) || 0;
@@ -280,8 +288,12 @@
     return yiq >= 150 ? "#1E293B" : "#FFFFFF";
   }
 
-  // 5. 格式化單一單元格的 JSON 內容為彩色徽章 (Chips)
-  function formatCellElement(cellEl, targetDoc) {
+  /**
+   * 5. 格式化單一單元格的 JSON 內容為彩色徽章 (Chips)
+   * @param {HTMLElement|null} [cellEl=null] - 單元格元素
+   * @param {Document|null} [targetDoc=null] - 目標文檔物件
+   */
+  function formatCellElement(cellEl = null, targetDoc = null) {
     if (!cellEl || cellEl.dataset.bcsFormatted === "true") return;
     const text = (cellEl.textContent || "").trim();
     if (!text.startsWith("[") || !text.includes('"name":')) return;
@@ -315,8 +327,12 @@
     } catch (errJson) {}
   }
 
-  // 6. 掃描並彩化指定 Document 中所有單元格
-  function formatGridRows(targetDoc) {
+  /**
+   * 6. 掃描並彩化指定 Document 中所有單元格
+   * @param {Document|null} [targetDoc=null] - 目標文檔物件
+   * @returns {number} 彩化數量
+   */
+  function formatGridRows(targetDoc = null) {
     const doc = targetDoc || document;
     if (!doc) return 0;
     const cells = doc.querySelectorAll(".aras-grid-row-cell, td[role='gridcell'], div[role='gridcell']");
@@ -330,7 +346,11 @@
 
   // 7. 方案 A：搜尋列標籤挑選卡片 (Popover Manager)
   let activePopover = null;
-  function getOrCreateSearchPopover(targetDoc) {
+  /**
+   * 取得或建立全域搜尋浮層物件
+   * @param {Document|null} [targetDoc=null] - 目標文檔物件
+   */
+  function getOrCreateSearchPopover(targetDoc = null) {
     const doc = targetDoc || document;
     if (doc._bcsGlobalPopover) return doc._bcsGlobalPopover;
 
@@ -367,7 +387,7 @@
     // 模式切換按鈕事件
     for (let m = 0; m < modeBtns.length; m++) {
       const btn = modeBtns[m];
-      btn.onclick = function (evt) {
+      btn.onclick = function (evt = null) {
         if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
         for (let b = 0; b < modeBtns.length; b++) {
           modeBtns[b].classList.remove("is-active");
@@ -399,7 +419,7 @@
           </span>
         `;
 
-        itemEl.onclick = function (evt) {
+        itemEl.onclick = function (evt = null) {
           if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
           const checkbox = itemEl.querySelector(".bcs-popover-checkbox");
           if (!checkbox) return;
@@ -424,8 +444,11 @@
       if (activePopover === popover) activePopover = null;
     }
 
-    // 開啟並定位浮層
-    function openPopover(targetInput) {
+    /**
+     * 開啟並定位浮層
+     * @param {HTMLElement|null} [targetInput=null] - 目標輸入框元素
+     */
+    function openPopover(targetInput = null) {
       if (!targetInput) return;
       currentBoundInput = targetInput;
       if (activePopover && activePopover !== popover) {
@@ -438,10 +461,10 @@
       selectedKeys.clear();
       const currentText = (targetInput.value || "").trim();
       if (currentText) {
-        const parts = currentText.split(/[,;|，；\s]+/).map(p => p.trim()).filter(Boolean);
+        const parts = currentText.split(/[,;|，；\s]+/).map((p = "") => p.trim()).filter(Boolean);
         for (let i = 0; i < availableTags.length; i++) {
           const t = availableTags[i];
-          if (parts.some(p => p.toLowerCase() === (t.label || "").toLowerCase() || p.toLowerCase() === (t.name || "").toLowerCase())) {
+          if (parts.some((p = "") => p.toLowerCase() === (t.label || "").toLowerCase() || p.toLowerCase() === (t.name || "").toLowerCase())) {
             selectedKeys.add(t.name);
           }
         }
@@ -462,7 +485,7 @@
 
     // 清空操作
     if (clearBtn) {
-      clearBtn.onclick = function (evt) {
+      clearBtn.onclick = function (evt = null) {
         if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
         selectedKeys.clear();
         renderList();
@@ -477,7 +500,7 @@
 
     // 套用搜尋
     if (applyBtn) {
-      applyBtn.onclick = function (evt) {
+      applyBtn.onclick = function (evt = null) {
         if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
         if (!currentBoundInput) return;
 
@@ -511,7 +534,7 @@
     }
 
     // 監聽點擊外部與 Esc 鍵自動關閉
-    doc.addEventListener("mousedown", function (evt) {
+    doc.addEventListener("mousedown", function (evt = null) {
       if (!evt) return;
       const targetNode = evt.target;
       if (targetNode && !popover.contains(targetNode) && targetNode !== currentBoundInput && !(targetNode.closest && targetNode.closest(".bcs-search-picker-badge-btn"))) {
@@ -519,7 +542,7 @@
       }
     });
 
-    doc.addEventListener("keydown", function (evt) {
+    doc.addEventListener("keydown", function (evt = null) {
       if (evt && evt.key === "Escape") {
         closePopover();
       }
@@ -530,8 +553,12 @@
     return manager;
   }
 
-  // 8. 方案 A：掛載搜尋列標籤輸入框 (三重精確偵測，非侵入式結構)
-  function attachSearchInput(targetDoc) {
+  /**
+   * 8. 方案 A：掛載搜尋列標籤輸入框 (三重精確偵測，非侵入式結構)
+   * @param {Document|null} [targetDoc=null] - 目標文檔物件
+   * @returns {number} 掛載成功數量
+   */
+  function attachSearchInput(targetDoc = null) {
     const doc = targetDoc || document;
     if (!doc) return 0;
 
@@ -611,7 +638,7 @@
           btn.title = "點擊開啟彩色標籤篩選卡片 (方案 A)";
           btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path></svg>`;
 
-          btn.onclick = function (evt) {
+          btn.onclick = function (evt = null) {
             if (evt) {
               evt.preventDefault();
               evt.stopPropagation();
@@ -622,7 +649,7 @@
         }
 
         // 綁定點擊與焦點事件 (方案 A：點擊輸入框即彈出彩色標籤卡片)
-        input.onclick = function (evt) {
+        input.onclick = function (evt = null) {
           if (evt && typeof evt.stopPropagation === "function") evt.stopPropagation();
           popoverManager.open(input);
         };
@@ -637,10 +664,18 @@
     return attachedCount;
   }
 
-  // 9. 遞迴收集全域所有 iframe 視窗
-  function getAllFrames(rootWin) {
+  /**
+   * 9. 遞迴收集全域所有 iframe 視窗
+   * @param {Window|null} [rootWin=null] - 根視窗物件
+   * @returns {Array<Window>} 視窗陣列
+   */
+  function getAllFrames(rootWin = null) {
     const list = [];
-    function scan(w) {
+    /**
+     * 掃描子框架
+     * @param {Window|null} [w=null] - 當前掃描視窗
+     */
+    function scan(w = null) {
       if (!w) return;
       try {
         list.push(w);
@@ -657,8 +692,12 @@
     return list;
   }
 
-  // 10. 對單一 Grid 視窗進行彩化與監控
-  function enhanceWindow(w) {
+  /**
+   * 10. 對單一 Grid 視窗進行彩化與監控
+   * @param {Window|null} [w=null] - 目標視窗物件
+   * @returns {boolean} 是否成功增強
+   */
+  function enhanceWindow(w = null) {
     if (!w || !w.document) return false;
     const doc = w.document;
     const hasGrid = doc.querySelector(".aras-grid") || doc.querySelector(".aras-grid-row-cell") || doc.querySelector(".aras-grid-head") || w.grid;
