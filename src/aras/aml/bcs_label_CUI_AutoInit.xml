@@ -1,0 +1,35 @@
+<AML>
+  <!-- ===================================================================== -->
+  <!-- Aras Innovator R36 Main Grid 自動載入 CUI 配置腳本 -->
+  <!-- 功能: 將 bcs_main_grid_extension 作為主網格工具列之 Init Method 自動觸發 -->
+  <!-- 執行方式: 在 Aras Nash Client (Apply AML) 中執行此段 AML -->
+  <!-- ===================================================================== -->
+
+  <!-- 1. 建立工具列 CommandBarButton 項目 (指向 bcs_main_grid_extension) -->
+  <Item type="CommandBarButton" action="merge" where="name='bcs_main_grid_auto_init'">
+    <name>bcs_main_grid_auto_init</name>
+    <label xml:lang="zh-TW">標記網格自動增強</label>
+    <label xml:lang="en">BCS Label Grid Auto Init</label>
+    <on_init_handler>
+      <Item type="Method" action="get">
+        <name>bcs_main_grid_extension</name>
+      </Item>
+    </on_init_handler>
+  </Item>
+
+  <!-- 2. 將該按鈕關聯至全系統主搜尋網格工具列 Section (mwt_main_grid_toolbar) -->
+  <Item type="CommandBarSectionItem" action="merge" where="source_id=(SELECT id FROM [COMMANDBARSECTION] WHERE name='com.aras.innovator.cui_default.mwt_main_grid_toolbar') AND related_id=(SELECT id FROM [COMMANDBARBUTTON] WHERE name='bcs_main_grid_auto_init')">
+    <source_id>
+      <Item type="CommandBarSection" action="get" select="id">
+        <name>com.aras.innovator.cui_default.mwt_main_grid_toolbar</name>
+      </Item>
+    </source_id>
+    <related_id>
+      <Item type="CommandBarButton" action="get" select="id">
+        <name>bcs_main_grid_auto_init</name>
+      </Item>
+    </related_id>
+    <sort_order>9999</sort_order>
+    <action>Add</action>
+  </Item>
+</AML>

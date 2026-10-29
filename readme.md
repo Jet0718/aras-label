@@ -200,25 +200,20 @@
    > [!NOTE]
    > **架構說明**：ItemType 的 **Client Events** 頁籤只有項目實體生命週期（`OnBeforeNew`, `OnNew`, `OnAfterNew`, `OnShowItem`），**無主網格的 `onLoad`**。請使用以下方式掛載：
 
-   - **途徑 A（最推薦！最簡潔原生）：在 ItemType 的 Actions 頁籤掛載**：
-     - 開啟目標 ItemType（如 `Part`），點擊 **Edit** 鎖定。
-     - 切換至 **Actions** 頁籤（位於 Client Events 旁，非 Client Events）。
-     - 點擊 **Create** 或 **Add Row**：
-       - **Name**: `bcs_main_grid_extension`
-       - **Label**: `標記增強與彩化`
-       - **Type**: `Item`
-       - **Location**: `Client`
-       - **Target**: `None`
-       - **Method**: 選擇 `bcs_main_grid_extension`
-     - 點擊 **Save** 並 **Done**。
-     - **使用方式**：在 Part 主搜尋畫面，隨時點擊工具列 **Actions > 標記增強與彩化**，網格立即完成彩化並掛載搜尋按鈕！
+    - **途徑 A（最推薦！100% 全自動零手動）：在 CUI CommandBarSection 掛載為 Init Method**：
+      - **效果**：使用者在 TOC 點擊「Parts」開啟搜尋畫面的一瞬間，系統自動初始化並彩化單元格、掛載搜尋框 Popover，完全無需手動點擊任何 Action！
+      - **設定步驟**：
+        1. 進入 **Administration > Configuration > CommandBarSection**。
+        2. 搜尋開啟 `com.aras.innovator.cui_default.mwt_main_grid_toolbar`（全系統主網格工具列）。
+        3. 切換至 **Command Bar Items** 頁籤，點擊建立新項目（例如 `bcs_main_grid_auto_init`）：
+           - **Item Classification**: `CommandBarButton`
+           - **Name**: `bcs_main_grid_auto_init`
+           - **Label**: `標記自動增強`
+           - **Init Method**: 選擇 `bcs_main_grid_extension`
+        4. 儲存並解鎖。此後開啟任何主搜尋網格均全自動就緒！
 
-   - **途徑 B（全自動執行）：在 CUI CommandBarSection 掛載為 Init Method**：
-     - 進入 **Administration > Configuration > CommandBarSection**。
-     - 搜尋開啟 `com.aras.innovator.cui_default.mwt_main_grid_toolbar`。
-     - 在 **Command Bar Items** 頁籤新增一筆按鈕項目，將其 **Init Method** 設定為 `bcs_main_grid_extension`。
-     - 儲存後，每次載入 Main Grid 工具列時即自動執行擴充。
-
+    - **途徑 B（手動備用按鈕）：在 ItemType 的 Actions 頁籤掛載**：
+      - 開啟目標 ItemType（如 `Part`），於 **Actions** 頁籤新增動作 `bcs_main_grid_extension`，作為手動強制觸發或測試使用。
    - **途徑 C（3秒即時預覽）：在瀏覽器 Console 執行**：
      - 在 Part 搜尋畫面按 `F12` 打開開發者工具的 **Console**。
      - 貼上 `src/aras/client/bcs_main_grid_extension.js` 代碼並按 Enter，即可瞬間看到彩化與搜尋列按鈕！

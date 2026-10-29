@@ -634,19 +634,15 @@ function attachLabelSearchPopover(targetDocument: Document): void {
   > **重要概念**：ItemType 的 `Client Events` 頁籤僅提供項目生命週期事件（`OnBeforeNew`, `OnNew`, `OnAfterNew`, `OnShowItem`），**無主網格的 `onLoad` 選項**。
   > 主搜尋網格 (Main Search Grid) 的自訂擴充建議採用以下三種標準途徑之一：
 
-  1. **途徑一（最推薦！最簡潔原生：ItemType Action 動作）**：
-     - 在目標 ItemType（如 `Part`）的 **`Actions`** 頁籤中新增：
-       - `Name`: `bcs_main_grid_extension`
-       - `Label`: `標記增強與彩化`
-       - `Type`: `Item`
-       - `Location`: `Client`
-       - `Target`: `None`
-       - `Method`: 選擇 `bcs_main_grid_extension`
-     - 使用者在 Main Search 工具列的 `Actions` 選單中點擊該動作即可啟動彩化與搜尋選擇器。
-  2. **途徑二（官方 R36 全自動載入：CUI CommandBarSection Init Method）**：
-     - 前往 `Administration` -> `Configuration` -> `CommandBarSection`。
-     - 開啟主網格工具列對應的 Section（如 `com.aras.innovator.cui_default.mwt_main_grid_toolbar`）。
-     - 新增一個 CommandBarItem（按鈕），將其 **`Init Method`** 指向 `bcs_main_grid_extension`。Aras 在渲染主網格工具列時將全自動觸發執行。
+  1. **途徑一（官方首選！100% 全自動零手動：CUI CommandBarSection Init Method）**：
+     - **運作原理**：利用 Aras R36 核心之 Configurable User Interface (CUI)。當使用者於 TOC 點擊開啟主搜尋網格（Main Grid）時，工具列在初始化階段自動呼叫此 Method，瞬間完成單元格彩化與搜尋列按鈕掛載，並於頂層視窗常駐守護程序，完全無需使用者手動點擊 Action！
+     - **設定方式**：
+       - 前往 **Administration > Configuration > CommandBarSection**。
+       - 開啟主搜尋工具列對應的 Section：`com.aras.innovator.cui_default.mwt_main_grid_toolbar`（全系統通用）或目標 ItemType 的專屬主網格工具列。
+       - 在 **Command Bar Items** 頁籤新增一個按鈕（或隱藏按鈕），將其 **Init Method** 設定為 `bcs_main_grid_extension`。
+       - 儲存後，任何使用者只要開啟主搜尋網格，擴充功能即刻 100% 全自動就緒！
+  2. **途徑二（手動切換/隨選按鈕：ItemType Action 動作）**：
+     - 在目標 ItemType（如 `Part`）的 **Actions** 頁籤中新增動作 `bcs_main_grid_extension`，提供使用者在特定情境下隨時手動點擊重整或啟用。
   3. **途徑三（開發即時預覽：瀏覽器 Console 執行）**：
      - 在 Main Search 網格畫面按 `F12`，在 Console 貼上 `bcs_main_grid_extension.js` 代碼執行，即刻彩化網格並掛載搜尋框。
 - **職責說明**：

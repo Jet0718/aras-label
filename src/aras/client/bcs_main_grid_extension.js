@@ -923,12 +923,7 @@
 
   console.log("[bcs_label_grid] 掃描完成，已對 " + enhancedGridCount + " 個 Grid 畫面完成彩化與方案 A 搜尋卡片掛載！");
 
-  // 若由 Action 點擊觸發，彈出成功提示
-  if (arasObj && typeof arasObj.AlertSuccess === "function") {
-    arasObj.AlertSuccess("標記彩化與方案 A 搜尋選擇器已成功啟用！已套用至 " + enhancedGridCount + " 個視窗。");
-  }
-
-  // 在頂層 window.top 啟動全域守護定時器 (確保切換分頁或新開搜尋時持續生效)
+  // 在頂層 window.top 啟動全域守護定時器 (確保切換分頁或新開搜尋時持續全自動生效)
   const topWin = window.top || window;
   if (!topWin._bcs_global_grid_daemon) {
     topWin._bcs_global_grid_daemon = setInterval(function () {
@@ -940,4 +935,7 @@
       }
     }, 1200);
   }
+
+  // 相容 Aras CUI Init Method 回傳規範 (支援作為靜默隱形初始化項目自動載入)
+  return { cui_disabled: true, cui_invisible: true };
 })();
