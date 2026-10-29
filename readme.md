@@ -204,7 +204,7 @@
       - **效果**：使用者在 TOC 點擊「Parts」開啟搜尋畫面的一瞬間，系統自動初始化並彩化單元格、掛載搜尋框 Popover，完全無需手動點擊任何 Action！
       - **設定步驟**：
         1. 進入 **Administration > Configuration > CommandBarSection**。
-        2. 搜尋開啟 `com.aras.innovator.cui_default.mwt_main_grid_toolbar`（全系統主網格工具列）。
+        2. 搜尋開啟 `searchview.commandbar.default`（主搜尋網格工具列）。
         3. 切換至 **Command Bar Items** 頁籤，點擊建立新項目（例如 `bcs_main_grid_auto_init`）：
            - **Item Classification**: `CommandBarButton`
            - **Name**: `bcs_main_grid_auto_init`

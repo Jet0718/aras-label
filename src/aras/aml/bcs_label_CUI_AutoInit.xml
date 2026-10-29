@@ -1,7 +1,8 @@
 <AML>
   <!-- ===================================================================== -->
-  <!-- Aras Innovator R36 Main Grid 自動載入 CUI 配置腳本 -->
-  <!-- 功能: 將 bcs_main_grid_extension 作為主網格工具列之 Init Method 自動觸發 -->
+  <!-- Aras Innovator R36 Main Search Grid 全自動載入 CUI 配置腳本 -->
+  <!-- 目標 Section: searchview.commandbar.default (主搜尋網格工具列) -->
+  <!-- 效果: 主搜尋畫面一開啟即自動執行 bcs_main_grid_extension，徹底免手動點 Action -->
   <!-- 執行方式: 在 Aras Nash Client (Apply AML) 中執行此段 AML -->
   <!-- ===================================================================== -->
 
@@ -17,11 +18,11 @@
     </on_init_handler>
   </Item>
 
-  <!-- 2. 將該按鈕關聯至全系統主搜尋網格工具列 Section (mwt_main_grid_toolbar) -->
-  <Item type="CommandBarSectionItem" action="merge" where="source_id=(SELECT id FROM [COMMANDBARSECTION] WHERE name='com.aras.innovator.cui_default.mwt_main_grid_toolbar') AND related_id=(SELECT id FROM [COMMANDBARBUTTON] WHERE name='bcs_main_grid_auto_init')">
+  <!-- 2. 將該按鈕精確關聯至主搜尋網格工具列 Section (searchview.commandbar.default) -->
+  <Item type="CommandBarSectionItem" action="merge" where="source_id=(SELECT id FROM [COMMANDBARSECTION] WHERE name='searchview.commandbar.default') AND related_id=(SELECT id FROM [COMMANDBARBUTTON] WHERE name='bcs_main_grid_auto_init')">
     <source_id>
       <Item type="CommandBarSection" action="get" select="id">
-        <name>com.aras.innovator.cui_default.mwt_main_grid_toolbar</name>
+        <name>searchview.commandbar.default</name>
       </Item>
     </source_id>
     <related_id>

@@ -638,7 +638,7 @@ function attachLabelSearchPopover(targetDocument: Document): void {
      - **運作原理**：利用 Aras R36 核心之 Configurable User Interface (CUI)。當使用者於 TOC 點擊開啟主搜尋網格（Main Grid）時，工具列在初始化階段自動呼叫此 Method，瞬間完成單元格彩化與搜尋列按鈕掛載，並於頂層視窗常駐守護程序，完全無需使用者手動點擊 Action！
      - **設定方式**：
        - 前往 **Administration > Configuration > CommandBarSection**。
-       - 開啟主搜尋工具列對應的 Section：`com.aras.innovator.cui_default.mwt_main_grid_toolbar`（全系統通用）或目標 ItemType 的專屬主網格工具列。
+       - 開啟主搜尋工具列對應的 Section：`searchview.commandbar.default`（主搜尋網格工具列，清單索引 213）或全系統頂部標題列 `com.aras.innovator.cui_default.mwh_header`。
        - 在 **Command Bar Items** 頁籤新增一個按鈕（或隱藏按鈕），將其 **Init Method** 設定為 `bcs_main_grid_extension`。
        - 儲存後，任何使用者只要開啟主搜尋網格，擴充功能即刻 100% 全自動就緒！
   2. **途徑二（手動切換/隨選按鈕：ItemType Action 動作）**：
