@@ -12,7 +12,7 @@
  *   - 非侵入式 DOM 掛載：絕不破壞 Aras Grid 的原生 DOM 結構與虛擬滾動 (Virtual Scroll)。
  *   - 防裁切定位：Popover 節點獨立掛載於頂層 body，採 position: fixed，徹底解決 overflow 裁切問題。
  *   - 三重容錯欄位偵測：結合表頭文字、DOM 屬性與資料列 JSON 特徵，百分之百鎖定標籤欄位。
- *   - 嚴格型別預設值：消除 Aras Monaco/TypeScript linter 的 noImplicitAny 提示。
+ *   - 嚴格型別預設值：全數參數賦予安全預設值，徹底杜絕 Monaco 語法提示。
  */
 
 (function () {
@@ -33,10 +33,10 @@
     currentLang = "zh-TW";
   }
 
-  /**
-   * 2. 注入自訂現代化 CSS 樣式至指定 Document
-   * @param {Document|null} [targetDoc=null] - 目標文檔物件
-   */
+  // --------------------------------------------------------------------------
+  // 2. 注入自訂現代化 CSS 樣式至指定 Document
+  // 參數: targetDoc (預設 null) - 目標文檔物件
+  // --------------------------------------------------------------------------
   function injectStyles(targetDoc = null) {
     const doc = targetDoc || document;
     if (!doc || !doc.head || doc.getElementById("bcs_main_grid_styles")) return;
@@ -273,11 +273,11 @@
     }
   }
 
-  /**
-   * 4. 計算高對比文字顏色 (深底配白字，淺底配深字)
-   * @param {string} [hexColor=""] - 十六進制色彩碼
-   * @returns {string} 高對比文字色
-   */
+  // --------------------------------------------------------------------------
+  // 4. 計算高對比文字顏色 (深底配白字，淺底配深字)
+  // 參數: hexColor (預設 "") - 十六進制色彩碼
+  // 回傳: 高對比文字色 ("#1E293B" 或 "#FFFFFF")
+  // --------------------------------------------------------------------------
   function getContrastColor(hexColor = "") {
     if (!hexColor || typeof hexColor !== "string") return "#FFFFFF";
     const clean = hexColor.replace("#", "");
@@ -288,11 +288,11 @@
     return yiq >= 150 ? "#1E293B" : "#FFFFFF";
   }
 
-  /**
-   * 5. 格式化單一單元格的 JSON 內容為彩色徽章 (Chips)
-   * @param {HTMLElement|null} [cellEl=null] - 單元格元素
-   * @param {Document|null} [targetDoc=null] - 目標文檔物件
-   */
+  // --------------------------------------------------------------------------
+  // 5. 格式化單一單元格的 JSON 內容為彩色徽章 (Chips)
+  // 參數: cellEl (預設 null) - 單元格元素
+  // 參數: targetDoc (預設 null) - 目標文檔物件
+  // --------------------------------------------------------------------------
   function formatCellElement(cellEl = null, targetDoc = null) {
     if (!cellEl || cellEl.dataset.bcsFormatted === "true") return;
     const text = (cellEl.textContent || "").trim();
@@ -327,11 +327,11 @@
     } catch (errJson) {}
   }
 
-  /**
-   * 6. 掃描並彩化指定 Document 中所有單元格
-   * @param {Document|null} [targetDoc=null] - 目標文檔物件
-   * @returns {number} 彩化數量
-   */
+  // --------------------------------------------------------------------------
+  // 6. 掃描並彩化指定 Document 中所有單元格
+  // 參數: targetDoc (預設 null) - 目標文檔物件
+  // 回傳: 彩化數量 (number)
+  // --------------------------------------------------------------------------
   function formatGridRows(targetDoc = null) {
     const doc = targetDoc || document;
     if (!doc) return 0;
@@ -344,12 +344,11 @@
     return count;
   }
 
+  // --------------------------------------------------------------------------
   // 7. 方案 A：搜尋列標籤挑選卡片 (Popover Manager)
+  // 參數: targetDoc (預設 null) - 目標文檔物件
+  // --------------------------------------------------------------------------
   let activePopover = null;
-  /**
-   * 取得或建立全域搜尋浮層物件
-   * @param {Document|null} [targetDoc=null] - 目標文檔物件
-   */
   function getOrCreateSearchPopover(targetDoc = null) {
     const doc = targetDoc || document;
     if (doc._bcsGlobalPopover) return doc._bcsGlobalPopover;
@@ -444,10 +443,10 @@
       if (activePopover === popover) activePopover = null;
     }
 
-    /**
-     * 開啟並定位浮層
-     * @param {HTMLElement|null} [targetInput=null] - 目標輸入框元素
-     */
+    // ------------------------------------------------------------------------
+    // 開啟並定位浮層
+    // 參數: targetInput (預設 null) - 目標輸入框元素
+    // ------------------------------------------------------------------------
     function openPopover(targetInput = null) {
       if (!targetInput) return;
       currentBoundInput = targetInput;
@@ -553,11 +552,11 @@
     return manager;
   }
 
-  /**
-   * 8. 方案 A：掛載搜尋列標籤輸入框 (三重精確偵測，非侵入式結構)
-   * @param {Document|null} [targetDoc=null] - 目標文檔物件
-   * @returns {number} 掛載成功數量
-   */
+  // --------------------------------------------------------------------------
+  // 8. 方案 A：掛載搜尋列標籤輸入框 (三重精確偵測，非侵入式結構)
+  // 參數: targetDoc (預設 null) - 目標文檔物件
+  // 回傳: 掛載成功數量 (number)
+  // --------------------------------------------------------------------------
   function attachSearchInput(targetDoc = null) {
     const doc = targetDoc || document;
     if (!doc) return 0;
@@ -664,17 +663,14 @@
     return attachedCount;
   }
 
-  /**
-   * 9. 遞迴收集全域所有 iframe 視窗
-   * @param {Window|null} [rootWin=null] - 根視窗物件
-   * @returns {Array<Window>} 視窗陣列
-   */
+  // --------------------------------------------------------------------------
+  // 9. 遞迴收集全域所有 iframe 視窗
+  // 參數: rootWin (預設 null) - 根視窗物件
+  // 回傳: 視窗陣列
+  // --------------------------------------------------------------------------
   function getAllFrames(rootWin = null) {
     const list = [];
-    /**
-     * 掃描子框架
-     * @param {Window|null} [w=null] - 當前掃描視窗
-     */
+    // 掃描子框架 (參數: w - 當前掃描視窗)
     function scan(w = null) {
       if (!w) return;
       try {
@@ -692,11 +688,11 @@
     return list;
   }
 
-  /**
-   * 10. 對單一 Grid 視窗進行彩化與監控
-   * @param {Window|null} [w=null] - 目標視窗物件
-   * @returns {boolean} 是否成功增強
-   */
+  // --------------------------------------------------------------------------
+  // 10. 對單一 Grid 視窗進行彩化與監控
+  // 參數: w (預設 null) - 目標視窗物件
+  // 回傳: 是否成功增強 (boolean)
+  // --------------------------------------------------------------------------
   function enhanceWindow(w = null) {
     if (!w || !w.document) return false;
     const doc = w.document;
