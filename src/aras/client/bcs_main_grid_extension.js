@@ -531,7 +531,7 @@
           // 3. 同步 ArasModules.Grid / HyperGrid 的 head 定義
           if (w.grid && w.grid.head) {
             try {
-              for (const [headId, colDef] of w.grid.head.entries()) {
+              for (const colDef of w.grid.head.values()) {
                 const colName = (colDef.name || colDef.field || "").toLowerCase();
                 const colLabel = (colDef.label || "").toLowerCase();
                 if (colName === "labels" || colLabel.includes("標記") || colLabel.includes("標籤")) {
@@ -604,19 +604,16 @@
             window.top
           ];
 
-          let searchTriggered = false;
           for (let wIdx = 0; wIdx < candidateWins.length; wIdx++) {
             const w = candidateWins[wIdx];
             if (!w) continue;
             try {
               if (w.searchContainer && typeof w.searchContainer.onSearch === "function") {
                 w.searchContainer.onSearch();
-                searchTriggered = true;
                 break;
               }
               if (typeof w.onSearchCommand === "function") {
                 w.onSearchCommand();
-                searchTriggered = true;
                 break;
               }
               if (w.document) {
@@ -625,7 +622,6 @@
                 );
                 if (searchBtn && typeof searchBtn.click === "function") {
                   searchBtn.click();
-                  searchTriggered = true;
                   break;
                 }
               }

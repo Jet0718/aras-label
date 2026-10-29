@@ -14,6 +14,8 @@ description: Aras Innovator 企業級開發指引與語法防護技能，涵蓋 
   Aras Monaco Editor 啟用 `noImplicitAny`。純 JS 函式所有參數必須給予明確預設值（例如 `targetDoc = null`, `hexColor = ""`）。
 - **註解風格守則 (Anti-TS80001)**：
   嚴禁在純 JS 中撰寫 TypeScript `: Type` 語法，亦不要在 JSDoc 中使用 `{Type}` 花括號，改用標準中文行註解說明參數，防止觸發 `JSDoc types may be moved to TypeScript types` 提示。
+- **零未使用變數守則 (Anti-TS6133)**：
+  Aras Monaco Editor 啟用 `noUnusedLocals`。禁止解構出未讀取的變數（例如 Map 遍歷若僅取用 value，改用 `for (const val of map.values())`）；嚴禁宣告僅賦值但未被讀取的冗餘旗標變數。
 - **Grid DOM 防裁切原則**：
   主網格（HyperGrid）搜尋列具備虛擬滾動與重繪機制，浮層（Popover/Modal）必須掛載於 `document.body`，採用 `position: fixed` + `z-index: 999999`，動態計算座標。
 - **三重容錯欄位偵測**：

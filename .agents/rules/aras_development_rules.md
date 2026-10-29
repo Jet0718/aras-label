@@ -41,7 +41,18 @@
   function getContrastColor(hexColor = "") { ... }
   ```
 
-### 3. Grid 搜尋列 (Search Row) DOM 防破壞與防裁切原則
+### 3. 消除 `'xxx' is declared but its value is never read` (TS6133) 警告
+- **問題現象**：
+  Aras Check Syntax 報錯：
+  `'headId' is declared but its value is never read.`
+  `'searchTriggered' is declared but its value is never read.`
+- **根本原因**：
+  Aras Monaco 檢查器啟用了 `noUnusedLocals: true`，當解構出未使用的鍵值（如 `for (const [k, v] of map.entries())` 只用到 `v`）或宣告了僅有賦值但後續無讀取邏輯的變數時，會被標記為語法檢查錯誤。
+- **標準解法**：
+  1. Map / Object 迭代時若僅需 value，一律使用 `for (const val of map.values())`，避免解構出無用之 key 變數。
+  2. 迴圈或狀態判斷直接使用 `break` 或即時回傳，嚴禁聲明後續未被讀取引用的冗餘旗標變數。
+
+### 4. Grid 搜尋列 (Search Row) DOM 防破壞與防裁切原則
 - **問題現象**：
   直接包裝搜尋列 input 或在格子內掛載彈跳選單時，彈窗被截斷看不見，或者 Grid 重繪時 input 遺失跑版。
 - **根本原因**：

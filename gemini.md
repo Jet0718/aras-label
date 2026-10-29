@@ -21,7 +21,8 @@
 - **Client Method 語法防護**：
   1. 所有函式與回調參數必須提供預設值（如 `targetDoc = null`），杜絕 Monaco `noImplicitAny` 警告。
   2. 嚴禁在純 JS 中撰寫 TypeScript 語法，禁止在 JSDoc 中使用 `{Type}` 花括號，改用標準中文行註解，杜絕 `TS80001` 提示。
-  3. 主網格搜尋浮層採非侵入式結構，浮層掛載於 `document.body` 採 `position: fixed` 防裁切。
+  3. 禁止解構或宣告未讀取的變數（如 Map 遍歷用 `.values()`，不宣告未讀取的旗標），杜絕 `TS6133` 警告。
+  4. 主網格搜尋浮層採非侵入式結構，浮層掛載於 `document.body` 採 `position: fixed` 防裁切。
 - **Server Method 語法防護**：
   1. 嚴禁頂層 `using` 與 `namespace`，使用型別時帶完整命名空間。
   2. 所有分支路徑（含 catch）必須顯式返回 `Item`。
