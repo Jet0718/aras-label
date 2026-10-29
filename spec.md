@@ -636,11 +636,17 @@ function attachLabelSearchPopover(targetDocument: Document): void {
 
   1. **途徑一（官方首選！100% 全自動零手動：CUI CommandBarSection Init Method）**：
      - **運作原理**：利用 Aras R36 核心之 Configurable User Interface (CUI)。當使用者於 TOC 點擊開啟主搜尋網格（Main Grid）時，工具列在初始化階段自動呼叫此 Method，瞬間完成單元格彩化與搜尋列按鈕掛載，並於頂層視窗常駐守護程序，完全無需使用者手動點擊 Action！
-     - **設定方式**：
-       - 前往 **Administration > Configuration > CommandBarSection**。
-       - 開啟主搜尋工具列對應的 Section：`searchview.commandbar.default`（主搜尋網格工具列，清單索引 213）或全系統頂部標題列 `com.aras.innovator.cui_default.mwh_header`。
-       - 在 **Command Bar Items** 頁籤新增一個按鈕（或隱藏按鈕），將其 **Init Method** 設定為 `bcs_main_grid_extension`。
-       - 儲存後，任何使用者只要開啟主搜尋網格，擴充功能即刻 100% 全自動就緒！
+      - **設定方式 (Aras R36 實戰精確欄位)**：
+        1. 前往 **Administration > Configuration > Client Presentation**，開啟 **`Global`**。
+        2. 在下方 **Command Bar Section** 頁籤中搜尋並開啟 **`searchview.commandbar.default`**（主搜尋網格工具列，清單索引 213）。
+        3. 點擊 **Edit** 鎖定，切換至 **Command Bar Item** 頁籤，新增一筆資料並設定以下精確欄位：
+           - **ItemType**: 選擇 `Button`
+           - **Name**: 輸入 `bcs_main_grid_auto_init`
+           - **Init Method**: 選擇 Method `bcs_main_grid_extension`
+           - **Action**: 選擇 `Add`
+           - **For Identity**: 選擇 `World`
+        4. 點擊 **Save** 並點擊 **Done** 解鎖。
+        5. 儲存後，任何使用者只要開啟主搜尋網格，擴充功能即刻 100% 全自動就緒！
   2. **途徑二（手動切換/隨選按鈕：ItemType Action 動作）**：
      - 在目標 ItemType（如 `Part`）的 **Actions** 頁籤中新增動作 `bcs_main_grid_extension`，提供使用者在特定情境下隨時手動點擊重整或啟用。
   3. **途徑三（開發即時預覽：瀏覽器 Console 執行）**：

@@ -37,3 +37,13 @@ description: Aras Innovator 企業級開發指引與語法防護技能，涵蓋 
 - **ID 產生原則**：建立 ItemType 或實例時，禁止自訂非標準字串 ID，由 Aras 核心自動分配 32 碼 Hex GUID。
 - **RelationshipType 嵌套**：建立關聯表時，關聯 ItemType 需直接嵌套於 `<relationship_id>` 內一併建立。
 - **權限必配原則**：建立 ItemType 必須包含 `Allowed Permission` (`is_default=1`) 與 `ItemType Can Add`。
+
+### 4. CUI 主網格全自動載入規範 (Aras R36+)
+- **主搜尋工具列 Section**：
+  Aras R36 主搜尋網格 (Main Search Grid) 工具列之 Section 為 **`searchview.commandbar.default`**。
+- **Command Bar Item 精準欄位配置**：
+  在 `searchview.commandbar.default` 的 `Command Bar Item` 頁籤新增項目時：
+  1. **ItemType**: 必須選取 `Button` (系統底層自動映射至 `CommandBarButton`)。
+  2. **Action**: 必須明確選取 `Add`。
+  3. **For Identity**: 必須明確選取 `World`，以保證所有使用者登入均可生效。
+  4. **Init Method**: 設定為自訂初始化擴充 Method，達成開啟主搜尋網格 100% 全自動載入。

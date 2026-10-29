@@ -2,11 +2,12 @@
   <!-- ===================================================================== -->
   <!-- Aras Innovator R36 Main Search Grid 全自動載入 CUI 配置腳本 -->
   <!-- 目標 Section: searchview.commandbar.default (主搜尋網格工具列) -->
+  <!-- 欄位配置: ItemType=Button, Action=Add, For Identity=World, Init Method=bcs_main_grid_extension -->
   <!-- 效果: 主搜尋畫面一開啟即自動執行 bcs_main_grid_extension，徹底免手動點 Action -->
   <!-- 執行方式: 在 Aras Nash Client (Apply AML) 中執行此段 AML -->
   <!-- ===================================================================== -->
 
-  <!-- 1. 建立工具列 CommandBarButton 項目 (指向 bcs_main_grid_extension) -->
+  <!-- 1. 建立工具列 Button (CommandBarButton) 項目 (指向 bcs_main_grid_extension) -->
   <Item type="CommandBarButton" action="merge" where="name='bcs_main_grid_auto_init'">
     <name>bcs_main_grid_auto_init</name>
     <label xml:lang="zh-TW">標記網格自動增強</label>
@@ -18,7 +19,7 @@
     </on_init_handler>
   </Item>
 
-  <!-- 2. 將該按鈕精確關聯至主搜尋網格工具列 Section (searchview.commandbar.default) -->
+  <!-- 2. 精確關聯至主搜尋網格工具列 Section (searchview.commandbar.default) -->
   <Item type="CommandBarSectionItem" action="merge" where="source_id=(SELECT id FROM [COMMANDBARSECTION] WHERE name='searchview.commandbar.default') AND related_id=(SELECT id FROM [COMMANDBARBUTTON] WHERE name='bcs_main_grid_auto_init')">
     <source_id>
       <Item type="CommandBarSection" action="get" select="id">
@@ -30,7 +31,12 @@
         <name>bcs_main_grid_auto_init</name>
       </Item>
     </related_id>
-    <sort_order>9999</sort_order>
     <action>Add</action>
+    <for_identity>
+      <Item type="Identity" action="get" select="id">
+        <name>World</name>
+      </Item>
+    </for_identity>
+    <sort_order>9999</sort_order>
   </Item>
 </AML>
