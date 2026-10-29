@@ -287,6 +287,37 @@ class LabelTag {
 - **結果列表渲染層 (`GridCellFormatter`)**：
   在 Grid 渲染回調中將 JSON 字串解析為彩色 Badge。
 
+### 5.3 方案 A：Main Search 標籤搜尋列彩色多選浮層卡片 (Popover Widget) 詳細規格
+為了解決使用者的問題（在 Main Search 網格搜尋框中輸入 label 時，希望能如同 Form 表單一般直觀點選彩色標籤），採用「方案 A：點擊搜尋框彈出彩色標籤多選浮層卡片 (Popover)」作為核心實作方案。
+
+#### 1. 互動與視覺體驗 (與 Form 保持一致)
+- **浮層結構 (Popover Card)**：
+  - **標題區 (Header)**：顯示「標籤篩選過濾」及「且 (AND) / 或 (OR)」模式切換開關（預設為 AND）。
+  - **標籤清單區 (List)**：以垂直或網格流式列出所有可用標籤，每個標籤均呈現：
+    - 核取方塊 (`<input type="checkbox">`)
+    - 與 Form 完全一致的彩色藥丸徽章（背景色採 `bcs_label_tags.color`，文字自動計算黑/白最佳對比色）。
+    - 依使用者 Session 語系動態顯示之多語系標籤文字（例如繁中「緊急處理」）。
+  - **操作控制區 (Footer)**：
+    - 「清空 (Clear)」按鈕：清除所有已選標籤並清空搜尋欄位。
+    - 「套用搜尋 (Apply)」按鈕：確認所選項目，將條件回填至搜尋框，並自動觸發 Aras 主搜尋。
+- **觸發與收合機制**：
+  - **開啟觸發**：使用者點擊搜尋列「標記」欄位之 `<input>`，或點擊輸入框右側的標籤小圖示按鈕，即自動開啟浮層。
+  - **收合觸發**：使用者點擊浮層外部任意區域（Click Outside）或按下鍵盤 `Escape` 鍵，浮層平滑關閉。
+
+#### 2. Aras HyperGrid DOM 適配與防破壞規範
+- **非侵入式結構**：
+  - 嚴禁置換或搬移 Aras 原生 `<input>`（避免破壞 Aras Grid 的虛擬滾動與欄寬排版計算）。
+  - 搜尋小圖示按鈕採同層絕對定位（Overlay / Sibling 定位），不增加額外 wrapper 節點影響 Grid 樣式。
+- **防止浮層裁切 (Overflow Clipping Prevention)**：
+  - Popover DOM 節點直接掛載於最頂層 `document.body`，採用 `position: fixed` 與極高之 `z-index: 99999`。
+  - 根據目標 `<input>` 的 `getBoundingClientRect()` 動態計算 `top` 與 `left`，徹底杜絕因表格容器的 `overflow: hidden` 或 `overflow: auto` 導致浮層被裁切的問題。
+
+#### 3. 智慧欄位探測機制 (Field Detection Strategy)
+由於 Aras Innovator 各版本 (R12/R2023/R36) 的 Main Grid DOM 類別與屬性略有差異，搜尋列之「標記」欄位採用三道容錯偵測：
+1. **表頭標題比對**：檢查表頭 cell（`.aras-grid-header-cell`, `th[role='columnheader']`, `.aras-grid-head-cell`）文字是否包含「標記」、「標籤」、「labels」或「Labels」。
+2. **屬性特徵比對**：檢查單元格之屬性（`data-index`, `data-key`, `data-head-id`）是否對齊 `labels`。
+3. **資料行特徵輔助**：若表頭結構受自訂樣式阻隔，透過掃描下方資料列單元格內容是否包含 `[{"name":` 特徵，反向鎖定所屬欄位之 Column Index，確保精準掛載。
+
 ---
 
 ## 6. Search 模組 Mermaid 圖表集
@@ -390,6 +421,126 @@ stateDiagram-v2
     PopoverOpened --> SearchExecuting: 點擊「套用搜尋」或按 Enter
     SearchExecuting --> ResultRendering: 後端 onBeforeGet 命中資料返回
     ResultRendering --> Idle: Grid 顯示彩色標籤完成
+```
+
+### 6.6 方案 A 模組關係圖 (Module Relationships)
+```mermaid
+graph TD
+    subgraph ArasMainGrid["Aras Innovator Main Grid Client"]
+        GridDOM["Grid Header & Search Cells"]
+        InputEl["Native Search &lt;input&gt; (labels column)"]
+        GridObserver["MutationObserver (持續監聽重繪)"]
+    end
+
+    subgraph BCSGridExtension["bcs_main_grid_extension.js"]
+        FieldDetector["FieldDetector (三重容錯欄位偵測)"]
+        PopoverManager["PopoverManager (浮層生命週期管理)"]
+        TagCatalog["TagCatalog (快取 bcs_label_tags 目錄)"]
+        ThemeEngine["ThemeEngine (對比色計算與樣式注入)"]
+        ArasDispatcher["ArasDispatcher (Criteria 寫入與搜尋觸發)"]
+    end
+
+    subgraph DOMPopover["動態掛載 DOM 節點 (掛載至 body)"]
+        PopoverEl["div.bcs-search-popover (Fixed 定位)"]
+        ModeSwitch["AND / OR 切換開關"]
+        TagList["彩色徽章勾選清單 (Chips List)"]
+        ActionFooter["清空 / 套用搜尋按鈕"]
+    end
+
+    GridDOM -->|監聽 DOM 變動| GridObserver
+    GridObserver -->|觸發掃描| FieldDetector
+    FieldDetector -->|精確識別 labels 欄位| InputEl
+    InputEl -->|綁定點擊與焦點事件| PopoverManager
+    PopoverManager -->|取得彩色標籤資料| TagCatalog
+    PopoverManager -->|計算黑白字體與陰影| ThemeEngine
+    PopoverManager -->|渲染浮層結構至 body| PopoverEl
+    PopoverEl --> ModeSwitch
+    PopoverEl --> TagList
+    PopoverEl --> ActionFooter
+    ActionFooter -->|點擊套用| ArasDispatcher
+    ArasDispatcher -->|回寫 criteria 並派發 input/change 事件| InputEl
+    ArasDispatcher -->|調用 onSearchCommand| GridDOM
+```
+
+### 6.7 方案 A 搜尋列掛載與互動流程圖 (Flowchart)
+```mermaid
+flowchart TD
+    Start([啟動 Grid 擴充掃描]) --> GetFrames[遞迴取得所有 iframe 視窗]
+    GetFrames --> CheckGrid{視窗是否包含 aras-grid 或網格元件?}
+    CheckGrid -- 否 --> NextFrame([跳過至下一視窗])
+    CheckGrid -- 是 --> DetectCol[執行欄位偵測: 標記 / labels]
+    
+    DetectCol --> HeaderMatch{表頭文字包含標記/labels?}
+    HeaderMatch -- 是 --> FoundCol[鎖定目標 Column Index]
+    HeaderMatch -- 否 --> AttrMatch{單元格屬性為 labels?}
+    AttrMatch -- 是 --> FoundCol
+    AttrMatch -- 否 --> DataRowMatch{資料行包含 JSON 特徵?}
+    DataRowMatch -- 是 --> FoundCol
+    DataRowMatch -- 否 --> EndScan([未找到標記欄位])
+
+    FoundCol --> FindInput[取得該欄位之搜尋 input]
+    FindInput --> CheckAttached{是否已掛載 Popover?}
+    CheckAttached -- 是 --> ObserveDOM[建立 MutationObserver 守護]
+    CheckAttached -- 否 --> BindTrigger[綁定 Click / Focus / 圖示按鈕]
+    
+    BindTrigger --> UserClick[/使用者點擊搜尋框或標籤圖示/]
+    UserClick --> CalcPos[依 input.getBoundingClientRect 計算定位]
+    CalcPos --> RenderTags[繪製多語系彩色徽章清單與 Checkbox]
+    RenderTags --> ShowPopover[顯示浮層 (z-index: 99999)]
+    
+    ShowPopover --> UserAction{使用者操作}
+    UserAction -- 勾選標籤 --> UpdateSelected[更新選取狀態並高亮項目]
+    UserAction -- 切換模式 --> ToggleMode[切換 AND / OR 運算子]
+    UserAction -- 點擊清空 --> ClearAll[清空已選標籤與輸入框]
+    UserAction -- 點擊外部/按 Esc --> HidePopover[關閉浮層]
+    
+    UserAction -- 點擊套用搜尋 --> ApplyCriteria[組合條件字串: 標籤1, 標籤2]
+    ApplyCriteria --> DispatchEvents[派發 input 與 change 原生事件]
+    DispatchEvents --> TriggerArasSearch[觸發 Aras 主搜尋 (onSearchCommand)]
+    TriggerArasSearch --> HidePopover
+```
+
+### 6.8 方案 A 前端核心虛擬碼 (Pseudocode)
+```typescript
+/**
+ * 方案 A 核心演算法虛擬碼
+ */
+function attachLabelSearchPopover(targetDocument: Document): void {
+    // 1. 智慧探測標記欄位索引
+    let labelsColIndex = findLabelsColumnIndex(targetDocument);
+    if (labelsColIndex === null) return;
+
+    // 2. 獲取該欄位的原生搜尋輸入框
+    let searchInput = getSearchInputByColumnIndex(targetDocument, labelsColIndex);
+    if (!searchInput || searchInput._bcsPopoverBound) return;
+    searchInput._bcsPopoverBound = true;
+
+    // 3. 建立或取得共用 Popover DOM (掛載於 document.body，避免 overflow 裁切)
+    let popover = getOrCreateGlobalPopover(targetDocument);
+
+    // 4. 事件綁定 (非侵入式，保留原生 input)
+    searchInput.addEventListener("click", (evt) => {
+        openPopover(popover, searchInput);
+    });
+    searchInput.addEventListener("focus", (evt) => {
+        openPopover(popover, searchInput);
+    });
+
+    // 5. 套用搜尋回調
+    popover.onApply = (selectedTagKeys: string[], matchMode: "AND" | "OR") => {
+        const displayLabels = selectedTagKeys.map(key => getTagDisplayLabel(key));
+        const criteriaText = displayLabels.join(matchMode === "OR" ? " | " : ", ");
+        
+        // 回寫並通知 Aras Grid 模型
+        searchInput.value = criteriaText;
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        searchInput.dispatchEvent(new Event("change", { bubbles: true }));
+        
+        // 觸發 Aras 主搜尋
+        triggerArasSearchCommand(targetDocument);
+        popover.hide();
+    };
+}
 ```
 
 ---
