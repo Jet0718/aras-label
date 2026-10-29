@@ -511,10 +511,29 @@ flowchart TD
     TriggerArasSearch --> HidePopover
 ```
 
-### 6.8 方案 A 前端核心虛擬碼 (Pseudocode)
+### 6.8 Virtual DOM 防崩潰渲染架構 (Virtual DOM Safety Architecture)
+為徹底消除 Aras Innovator HyperGrid (Inferno.js) 在欄位拖拉、調整欄寬與虛擬滾動時引發的 `NotFoundError: Failed to execute 'insertBefore' on 'Node'` 與單元格錯位問題（如 `State` 欄位被彩化覆蓋），規範採用以下三層防護：
+
+```mermaid
+flowchart TD
+    CellEvent["Grid 單元格渲染 / 虛擬滾動複用"]
+    CheckColumn{"當前單元格是否屬於 labels 欄位?<br/>(依據 grid.settings.indexHead / headId)"}
+    
+    CheckColumn -- 否 (例如 State, Part Number) --> RestoreCell["安全還原單元格：<br/>1. 移除殘留之 .bcs-grid-tags-cell<br/>2. 恢復原生文字顯示<br/>3. 嚴禁觸動原生 TextNode"]
+    CheckColumn -- 是 (確為 labels 欄位) --> ParseJson{"單元格內容是否為合法標籤 JSON?"}
+    
+    ParseJson -- 否 --> KeepNative["保留原生文字顯示"]
+    ParseJson -- 是 --> ZeroDestruction["零破壞渲染 (Zero-Destruction Overlay)：<br/>1. 絕對不執行 cellEl.innerHTML = ''<br/>2. 原生 TextNode 保留在 DOM 樹，以 CSS visibility:hidden 隱藏<br/>3. 建立獨立 .bcs-grid-tags-cell 絕對定位覆蓋<br/>4. Virtual DOM diffing 能永遠找到 oldNode，消除 insertBefore 報錯"]
+
+    RestoreCell --> InfernoDone["Inferno.js Virtual DOM 安全完成 Patch"]
+    KeepNative --> InfernoDone
+    ZeroDestruction --> InfernoDone
+```
+
+### 6.9 方案 A 前端核心虛擬碼 (Pseudocode)
 ```typescript
 /**
- * 方案 A 核心演算法虛擬碼 (含四層深度同步)
+ * 方案 A 核心演算法虛擬碼 (含 Virtual DOM 零破壞渲染與四層深度同步)
  */
 function attachLabelSearchPopover(targetDocument: Document): void {
     // 1. 智慧探測標記欄位索引

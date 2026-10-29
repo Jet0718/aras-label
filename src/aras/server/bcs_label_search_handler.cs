@@ -24,7 +24,7 @@ try
         return this; // 無標籤查詢條件，直接放行原生查詢
     }
 
-    // 1. 解析使用者輸入之標籤關鍵字 (去除頭尾萬用字元 * 與 %，依逗號、分號或空白切分)
+    // 1. 解析使用者輸入之標籤關鍵字 (去除頭尾萬用字元 * 與 %，依逗號、分號、直線或空白切分)
     string clean = rawCriteria.Trim().Trim('*', '%', ' ');
     char[] splitSeparators = new char[] { ',', ';', '，', '；', '|' };
     string[] rawParts = clean.Split(splitSeparators, StringSplitOptions.RemoveEmptyEntries);
@@ -51,24 +51,23 @@ try
     catalogQuery.setAttribute("language", "*");
     Item catalogResult = catalogQuery.apply();
 
-    // 若直接查詢因權限或關聯約束查無結果，自動透過父表 bcs_label ("Part_Labels") 補查
+    // 若直接查詢因權限或關聯約束查無結果，自動透過父表 bcs_label 補查 (不鎖死 Part_Labels 單一名稱)
     if (catalogResult.isError() || catalogResult.getItemCount() == 0)
     {
         Item parentQuery = inn.newItem(parentItemType, "get");
         parentQuery.setAttribute("select", "name");
-        parentQuery.setProperty("name", "Part_Labels");
         Item relQuery = inn.newItem(tagItemType, "get");
         relQuery.setAttribute("select", "name,label");
         relQuery.setAttribute("language", "*");
         parentQuery.addRelationship(relQuery);
         Item parentRes = parentQuery.apply();
-        if (!parentRes.isError())
+        if (!parentRes.isError() && parentRes.getItemCount() > 0)
         {
             catalogResult = parentRes.getRelationships(tagItemType);
         }
     }
 
-    // 提取所有候選標籤之代碼 (Key) 與所有多語系文字 (Labels)
+    // 提取所有候選標籤之代碼 (Key) 與所有多語系文字 (Labels: 繁中 zt/zh-TW, 簡中 zh-CN, 英文 en 等)
     List<Tuple<string, string>> availableCatalogTags = new List<Tuple<string, string>>();
     if (!catalogResult.isError() && catalogResult.getItemCount() > 0)
     {
@@ -88,10 +87,10 @@ try
                 availableCatalogTags.Add(new Tuple<string, string>(n, defaultLabel));
             }
 
-            // 深入 XML 節點取出所有多語系 label 節點 (zh-TW, zh-CN, en 等)
+            // 深入 XML 節點取出所有多語系 label 節點 (zt, zh-TW, zh-CN, en 等)
             if (t.node != null)
             {
-                System.Xml.XmlNodeList labelNodes = t.node.SelectNodes("label");
+                System.Xml.XmlNodeList labelNodes = t.node.SelectNodes("*[local-name()='label']");
                 if (labelNodes != null)
                 {
                     foreach (System.Xml.XmlNode lblNode in labelNodes)
@@ -111,9 +110,11 @@ try
     List<string> resolvedKeys = new List<string>();
     List<bool> isCatalogKeys = new List<bool>();
 
-    foreach (string term in searchTerms)
+    foreach (string rawTerm in searchTerms)
     {
+        string term = rawTerm.Replace("'", "''"); // 安全轉義單引號
         bool matched = false;
+
         // 優先嘗試精確比對目錄中的 name 或多語系 label (大小寫無關)
         foreach (var catTag in availableCatalogTags)
         {
@@ -166,13 +167,13 @@ try
     this.removeProperty(targetPropertyName);
 
     // 5. 動態構建安全且精確的 AML 查詢條件 (多標籤預設 AND 交集)
+    // 關鍵強化：為避免 JSON 序列化空格差異 (例如 "name":"urgent" vs "name": "urgent")，
+    // 對於目錄鍵值比對 %"key"%，100% 杜絕空格或格式差異引發的搜尋落空！
     if (resolvedKeys.Count == 1)
     {
         string key = resolvedKeys[0];
         bool isCatalog = isCatalogKeys[0];
-
-        // 若為目錄標準鍵值，精確匹配 JSON 屬性 %"name":"key"%；若為自訂文字，模糊匹配 %term%
-        string pattern = isCatalog ? $"%\"name\":\"{key}\"%" : $"%{key}%";
+        string pattern = isCatalog ? $"%\"{key}\"%" : $"%{key}%";
         this.setProperty(targetPropertyName, pattern);
         this.setPropertyAttribute(targetPropertyName, "condition", "like");
     }
@@ -180,8 +181,8 @@ try
     {
         // 多標籤 AND 條件：透過 AML 的 <and> 區塊展開
         // <and>
-        //   <labels condition="like">%"name":"urgent"%</labels>
-        //   <labels condition="like">%"name":"vip"%</labels>
+        //   <labels condition="like">%"urgent"%</labels>
+        //   <labels condition="like">%"vip"%</labels>
         // </and>
         System.Xml.XmlDocument doc = this.node.OwnerDocument;
         System.Xml.XmlElement andBlock = doc.CreateElement("and");
@@ -190,7 +191,7 @@ try
         {
             string key = resolvedKeys[i];
             bool isCatalog = isCatalogKeys[i];
-            string pattern = isCatalog ? $"%\"name\":\"{key}\"%" : $"%{key}%";
+            string pattern = isCatalog ? $"%\"{key}\"%" : $"%{key}%";
 
             System.Xml.XmlElement condElem = doc.CreateElement(targetPropertyName);
             condElem.SetAttribute("condition", "like");

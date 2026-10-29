@@ -16,6 +16,8 @@ description: Aras Innovator 企業級開發指引與語法防護技能，涵蓋 
   嚴禁在純 JS 中撰寫 TypeScript `: Type` 語法，亦不要在 JSDoc 中使用 `{Type}` 花括號，改用標準中文行註解說明參數，防止觸發 `JSDoc types may be moved to TypeScript types` 提示。
 - **零未使用變數守則 (Anti-TS6133)**：
   Aras Monaco Editor 啟用 `noUnusedLocals`。禁止解構出未讀取的變數（例如 Map 遍歷若僅取用 value，改用 `for (const val of map.values())`）；嚴禁宣告僅賦值但未被讀取的冗餘旗標變數。
+- **HyperGrid Virtual DOM 零破壞守則 (Anti-InsertBefore-Error)**：
+  Aras R36 主網格採用 HyperGrid (Inferno.js Virtual DOM)。**嚴禁在單元格使用 `cellEl.innerHTML = ""` 或刪除任何原生 childNodes**！否則在欄位拖拉、調整欄寬、虛擬滾動複用 DOM 時，Inferno.js 找不到舊節點，必拋 `NotFoundError: Failed to execute 'insertBefore' on 'Node'` 例外，並引發 DOM Recycle 錯位（導致徽章覆蓋非標籤欄位如 State）。正確作法：保留原生 TextNode 供 diffing 比對，原生文字改以 CSS visibility/transparent 隱藏，獨立疊加徽章層，並依 `grid.settings.indexHead` 嚴格限制欄位。
 - **Grid DOM 防裁切原則**：
   主網格（HyperGrid）搜尋列具備虛擬滾動與重繪機制，浮層（Popover/Modal）必須掛載於 `document.body`，採用 `position: fixed` + `z-index: 999999`，動態計算座標。
 - **三重容錯欄位偵測**：
