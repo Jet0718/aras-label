@@ -232,6 +232,7 @@
      - **套用搜尋**：點擊「套用搜尋」或直接按下 Enter 鍵，系統會自動將標籤組合為條件填入搜尋框，並自動觸發主網格搜尋！
      - **快速清空**：點擊浮層左下角的「清空」按鈕，立即重設已選標籤與輸入框條件。
     - 🛡️ **Virtual DOM 零破壞防錯位架構**：嚴禁清空單元格 DOM 子節點，保留原生 TextNode 供 Inferno.js diffing 演算法比對，徹底根除欄位拖拉時拋出的 NotFoundError 與單元格錯位覆蓋其他欄位（如 State）的重大問題。
+    - 🏷️ **純淨 TextNode 防污染渲染 (Anti-Contamination)**：提取單元格原生 JSON 時自動排除既有徽章容器文字干擾，徹底解決反覆搜尋或切換資料時因文字拼接導致 JSON.parse 報錯與標籤值卡死不更新問題。
     - ⚡ **搜尋條件四層深度同步**：在套用或更換條件時，自動與 currQryItem、searchContainer.searchMode 及 grid.head 保持雙向同步，支援反覆搜尋、條件替換與快速清空。
 ![alt text](image.png)
 

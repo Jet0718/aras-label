@@ -523,7 +523,7 @@ flowchart TD
     CheckColumn -- 是 (確為 labels 欄位) --> ParseJson{"單元格內容是否為合法標籤 JSON?"}
     
     ParseJson -- 否 --> KeepNative["保留原生文字顯示"]
-    ParseJson -- 是 --> ZeroDestruction["零破壞渲染 (Zero-Destruction Overlay)：<br/>1. 絕對不執行 cellEl.innerHTML = ''<br/>2. 原生 TextNode 保留在 DOM 樹，以 CSS visibility:hidden 隱藏<br/>3. 建立獨立 .bcs-grid-tags-cell 絕對定位覆蓋<br/>4. Virtual DOM diffing 能永遠找到 oldNode，消除 insertBefore 報錯"]
+    ParseJson -- 是 --> ZeroDestruction["零破壞渲染 (Zero-Destruction Overlay)：<br/>1. 絕對不執行 cellEl.innerHTML = ''<br/>2. 原生 TextNode 保留在 DOM 樹，以 CSS visibility:hidden 隱藏<br/>3. 建立獨立 .bcs-grid-tags-cell 絕對定位覆蓋<br/>4. 純淨提取原生 TextNode (排除既有徽章容器文字干擾)，防止反覆搜尋時 JSON.parse 因文字拼接崩潰導致舊標籤卡死殘留<br/>5. Virtual DOM diffing 能永遠找到 oldNode，消除 insertBefore 報錯"]
 
     RestoreCell --> InfernoDone["Inferno.js Virtual DOM 安全完成 Patch"]
     KeepNative --> InfernoDone

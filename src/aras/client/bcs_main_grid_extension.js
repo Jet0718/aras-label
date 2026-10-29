@@ -1,13 +1,15 @@
 // @ts-nocheck
 /**
  * ============================================================================
- * Aras Innovator R36 Main Grid 多標籤彩色徽章渲染與搜尋列選擇器擴充模組 (方案 A - Virtual DOM 防護強化版)
+ * Aras Innovator R36 Main Grid 多標籤彩色徽章渲染與搜尋列選擇器擴充模組
+ * (方案 A - Virtual DOM 防護與純淨 TextNode 防污染強化版)
  * ============================================================================
  * 遵循 S.O.L.I.D 設計原則開發，提供兩大核心能力：
- *   1. 資料行即時彩化 (Virtual DOM 零破壞架構)：
+ *   1. 資料行即時彩化 (Virtual DOM 零破壞與純淨 TextNode 防污染)：
  *      - 嚴禁使用 cellEl.innerHTML = "" 摧毀子節點，保留原生 TextNode 供 Inferno.js diffing 演算法比對。
  *      - 徹底消除欄位拖拉、調整欄寬時拋出之 'NotFoundError: Failed to execute insertBefore on Node' 例外。
- *      - 嚴格限定僅作用於 labels 欄位，徹底防止單元格節點複用時覆蓋 State 等其他欄位造成錯位。
+ *      - 純淨提取原生 TextNode (排除已渲染之徽章文字)，徹底解決反覆搜尋/更換條件時 JSON.parse 語法錯誤導致舊標籤卡死問題。
+ *      - 支援任意拖拉欄位位置 (如將標記移至中間)，依然百分之百精確鎖定並即時彩化。
  *   2. 搜尋列彩色浮層 (方案 A)：
  *      - 點擊搜尋列「標記」框或圖示按鈕彈出彩色標籤多選卡片 (Popover)。
  *      - 提供與 Form 表單 100% 一致之色票、多選勾選、AND/OR 模式切換與自動觸發搜尋。
@@ -15,13 +17,13 @@
  *
  * 架構特點：
  *   - 零破壞 Virtual DOM：保留原生節點，使用 CSS visibility/transparent 隱藏原生文字，浮動疊加徽章層。
- *   - 嚴格欄位鎖定：依據 grid.settings.indexHead 精確判定欄位，非 labels 欄位自動清理殘留增強層。
+ *   - 防污染解析：extractRawJsonText 排除自訂 container，確保 Virtual DOM 資料列切換時 JSON 解析永不失敗。
  *   - 防裁切定位：Popover 節點獨立掛載於頂層 body，採 position: fixed，徹底解決 overflow 裁切問題。
  *   - 嚴格型別預設值：全數參數賦予安全預設值，徹底杜絕 Monaco 語法提示 (Anti-TS80001, Anti-Implicit-Any, Anti-TS6133)。
  */
 
 (function () {
-  console.log("[bcs_label_grid] 正在啟動 Aras Main Grid 多標籤增強擴充模組 (方案 A - Virtual DOM 防護強化版)...");
+  console.log("[bcs_label_grid] 正在啟動 Aras Main Grid 多標籤增強擴充模組 (方案 A - 純淨 TextNode 防污染強化版)...");
 
   // 取得 Aras 核心全域物件 (相容當前視窗、父視窗與頂層視窗)
   const arasObj = window.aras || (window.parent && window.parent.aras) || (window.top && window.top.aras);
@@ -319,27 +321,27 @@
   }
 
   // --------------------------------------------------------------------------
-  // 5. 偵測當前視窗中 Grid 的 labels 欄位索引與 Head ID
-  // 參數: w (預設 null) - 目標視窗物件
-  // 回傳: { headId: string, colIndex: number } 或 null
+  // 5. 純淨提取單元格中的原生 JSON 文字 (排除已渲染之徽章容器與子節點干擾)
+  // 參數: cellEl (預設 null) - 單元格元素
+  // 回傳: 純淨原生文字字串 (string)
   // --------------------------------------------------------------------------
-  function getLabelsColumnInfo(w = null) {
-    if (!w || !w.grid || !w.grid.head) return null;
-    try {
-      const head = w.grid.head;
-      const indexHead = (w.grid.settings && w.grid.settings.indexHead) || Array.from(head.keys());
-      for (let i = 0; i < indexHead.length; i++) {
-        const hId = indexHead[i];
-        const colDef = head.get(hId);
-        if (!colDef) continue;
-        const name = (colDef.name || colDef.field || "").toLowerCase();
-        const label = (colDef.label || "").toLowerCase();
-        if (name === "labels" || label.includes("標記") || label.includes("標籤")) {
-          return { headId: hId, colIndex: i };
+  function extractRawJsonText(cellEl = null) {
+    if (!cellEl) return "";
+    let raw = "";
+    const children = cellEl.childNodes;
+    for (let i = 0; i < children.length; i++) {
+      const node = children[i];
+      // 提取純文字節點 (TextNode)
+      if (node.nodeType === 3) {
+        raw += node.nodeValue || "";
+      } else if (node.nodeType === 1) {
+        // 若為 ElementNode，但不是我們插入的徽章容器
+        if (!node.classList.contains("bcs-grid-tags-cell") && !node.classList.contains("bcs-grid-tag-badge")) {
+          raw += node.textContent || "";
         }
       }
-    } catch (errCol) {}
-    return null;
+    }
+    return raw.trim();
   }
 
   // --------------------------------------------------------------------------
@@ -351,7 +353,7 @@
   function formatCellElementSafely(cellEl = null, targetDoc = null, isLabelsColumn = true) {
     if (!cellEl) return;
 
-    // 若非標籤欄位 (例如被 Virtual DOM 複用給 State 或 Part Number)，立即清理殘留增強層並還原
+    // 1. 若非標籤欄位 (例如被 Virtual DOM 複用給 State 或 Part Number)，立即清理殘留增強層並還原
     if (!isLabelsColumn) {
       const existingContainer = cellEl.querySelector(".bcs-grid-tags-cell");
       if (existingContainer) {
@@ -361,7 +363,9 @@
       return;
     }
 
-    const text = (cellEl.textContent || "").trim();
+    // 2. 關鍵核心：使用純淨原生文字提取，排除已追加的 .bcs-grid-tags-cell 容器文字干擾！
+    const text = extractRawJsonText(cellEl);
+
     // 檢查內容特徵是否為標籤 JSON 陣列
     if (!text.startsWith("[") || !text.includes('"name":')) {
       const existingContainer = cellEl.querySelector(".bcs-grid-tags-cell");
@@ -374,7 +378,12 @@
 
     try {
       const arr = JSON.parse(text);
-      if (!Array.isArray(arr) || arr.length === 0) return;
+      if (!Array.isArray(arr) || arr.length === 0) {
+        const existingContainer = cellEl.querySelector(".bcs-grid-tags-cell");
+        if (existingContainer) existingContainer.remove();
+        cellEl.classList.remove("bcs-labels-cell-active");
+        return;
+      }
 
       const doc = targetDoc || document;
       let container = cellEl.querySelector(".bcs-grid-tags-cell");
@@ -389,12 +398,12 @@
       // 以 CSS 隱藏原生文字，絕不拔除原生節點
       cellEl.classList.add("bcs-labels-cell-active");
 
-      // 檢查快取鍵值 (避免無謂重繪造成效能損耗)
-      const cachedKey = arr.map((t = {}) => t.name || "").join(",");
-      if (container.dataset.bcsTagsKey === cachedKey) {
+      // 檢查快取鍵值 (比對當前標籤組合是否與已渲染一致，若不一致立即重繪最新標籤！)
+      const currentKeys = arr.map((t = {}) => t.name || "").join(",");
+      if (container.dataset.bcsTagsKey === currentKeys) {
         return;
       }
-      container.dataset.bcsTagsKey = cachedKey;
+      container.dataset.bcsTagsKey = currentKeys;
 
       // 重新繪製徽章清單 (僅操作自訂 container 內部，不干擾 cellEl 的原生子節點！)
       container.innerHTML = "";
@@ -412,41 +421,31 @@
         badge.textContent = displayLabel;
         container.appendChild(badge);
       }
-    } catch (errJson) {}
+    } catch (errJson) {
+      console.warn("[bcs_label_grid] 單元格 JSON 解析警告：", errJson);
+    }
   }
 
   // --------------------------------------------------------------------------
-  // 7. 掃描並彩化指定視窗之所有單元格 (嚴格限定標籤欄位)
+  // 7. 掃描並彩化指定視窗之所有單元格 (支援任意欄位拖曳順序)
   // 參數: w (預設 null) - 目標視窗物件
   // 回傳: 彩化數量 (number)
   // --------------------------------------------------------------------------
   function formatGridRowsSafely(w = null) {
     if (!w || !w.document) return 0;
     const doc = w.document;
-    const colInfo = getLabelsColumnInfo(w);
-    const rows = doc.querySelectorAll(".aras-grid-row, tr.aras-grid-row");
+    const cells = doc.querySelectorAll(".aras-grid-row-cell, td[role='gridcell'], div[role='gridcell']");
     let count = 0;
 
-    if (rows && rows.length > 0 && colInfo && colInfo.colIndex !== undefined) {
-      const targetColIdx = colInfo.colIndex;
-      for (let r = 0; r < rows.length; r++) {
-        const row = rows[r];
-        const cells = row.children;
-        for (let c = 0; c < cells.length; c++) {
-          const cell = cells[c];
-          const isTarget = (c === targetColIdx);
-          formatCellElementSafely(cell, doc, isTarget);
-          if (isTarget) count++;
-        }
-      }
-    } else {
-      // 若無 row 結構，安全掃描單元格，僅在完全符合 JSON 標籤時掛載
-      const cells = doc.querySelectorAll(".aras-grid-row-cell, td[role='gridcell'], div[role='gridcell']");
-      for (let i = 0; i < cells.length; i++) {
-        formatCellElementSafely(cells[i], doc, true);
-        count++;
-      }
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      // 依據純淨原生文字特徵判斷是否為標籤欄位
+      const rawText = extractRawJsonText(cell);
+      const hasJsonTags = rawText.startsWith("[") && rawText.includes('"name":');
+      formatCellElementSafely(cell, doc, hasJsonTags);
+      if (hasJsonTags) count++;
     }
+
     return count;
   }
 
@@ -762,7 +761,6 @@
   function attachSearchInputSafely(w = null) {
     if (!w || !w.document) return 0;
     const doc = w.document;
-    const colInfo = getLabelsColumnInfo(w);
     const popoverManager = getOrCreateSearchPopover(doc);
 
     // 尋找表頭搜尋列中所有 input
@@ -774,39 +772,26 @@
 
     let targetInput = null;
 
-    // 優先以 column index 或 head key 精確定位
-    if (colInfo && colInfo.colIndex !== undefined) {
-      // 在搜尋列單元格中找到對應索引
-      const searchCells = doc.querySelectorAll(".aras-grid-search-row-cell, tr.aras-grid-search-row td, .aras-grid-search-cell");
-      if (searchCells && searchCells.length > colInfo.colIndex) {
-        const targetCell = searchCells[colInfo.colIndex];
-        if (targetCell) {
-          targetInput = targetCell.querySelector("input");
-        }
+    // 透過表頭文字精確比對「標記」或「labels」欄位的 input
+    const headerCells = doc.querySelectorAll(".aras-grid-head-cell, .aras-grid-header-cell, th[role='columnheader'], th");
+    let targetLeft = null;
+    for (let h = 0; h < headerCells.length; h++) {
+      const th = headerCells[h];
+      const text = (th.textContent || "").trim();
+      const dataKey = th.getAttribute("data-key") || th.getAttribute("data-head-id") || "";
+      if (text.includes("標記") || text.includes("標籤") || text.toLowerCase().includes("labels") || dataKey.toLowerCase() === "labels") {
+        targetLeft = th.getBoundingClientRect().left;
+        break;
       }
     }
 
-    // 若未能直接以索引定位，透過表頭位置與屬性進行防護比對
-    if (!targetInput) {
-      const headerCells = doc.querySelectorAll(".aras-grid-head-cell, .aras-grid-header-cell, th[role='columnheader'], th");
-      let targetLeft = null;
-      for (let h = 0; h < headerCells.length; h++) {
-        const th = headerCells[h];
-        const text = (th.textContent || "").trim();
-        const dataKey = th.getAttribute("data-key") || th.getAttribute("data-head-id") || "";
-        if (text.includes("標記") || text.includes("標籤") || text.toLowerCase().includes("labels") || dataKey.toLowerCase() === "labels") {
-          targetLeft = th.getBoundingClientRect().left;
+    if (targetLeft !== null) {
+      for (let i = 0; i < inputs.length; i++) {
+        const inp = inputs[i];
+        const rect = inp.getBoundingClientRect();
+        if (Math.abs(rect.left - targetLeft) < 35) {
+          targetInput = inp;
           break;
-        }
-      }
-      if (targetLeft !== null) {
-        for (let i = 0; i < inputs.length; i++) {
-          const inp = inputs[i];
-          const rect = inp.getBoundingClientRect();
-          if (Math.abs(rect.left - targetLeft) < 35) {
-            targetInput = inp;
-            break;
-          }
         }
       }
     }
@@ -909,6 +894,17 @@
       obs.observe(doc.body, { childList: true, subtree: true });
     }
 
+    // 監聽 Aras Clear 按鈕點擊，同步重設搜尋模型
+    if (!doc._bcsClearHooked) {
+      doc._bcsClearHooked = true;
+      const clearBtn = doc.querySelector(".aras-button[data-id='clear'], button[data-id='clear'], button[title='Clear']");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", function () {
+          syncArasQueryModel(doc, "");
+        });
+      }
+    }
+
     return true;
   }
 
@@ -942,6 +938,6 @@
           enhanceWindow(currentFrames[k]);
         } catch (errDaemon) {}
       }
-    }, 1500);
+    }, 1200);
   }
 })();

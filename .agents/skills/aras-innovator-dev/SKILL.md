@@ -18,6 +18,8 @@ description: Aras Innovator 企業級開發指引與語法防護技能，涵蓋 
   Aras Monaco Editor 啟用 `noUnusedLocals`。禁止解構出未讀取的變數（例如 Map 遍歷若僅取用 value，改用 `for (const val of map.values())`）；嚴禁宣告僅賦值但未被讀取的冗餘旗標變數。
 - **HyperGrid Virtual DOM 零破壞守則 (Anti-InsertBefore-Error)**：
   Aras R36 主網格採用 HyperGrid (Inferno.js Virtual DOM)。**嚴禁在單元格使用 `cellEl.innerHTML = ""` 或刪除任何原生 childNodes**！否則在欄位拖拉、調整欄寬、虛擬滾動複用 DOM 時，Inferno.js 找不到舊節點，必拋 `NotFoundError: Failed to execute 'insertBefore' on 'Node'` 例外，並引發 DOM Recycle 錯位（導致徽章覆蓋非標籤欄位如 State）。正確作法：保留原生 TextNode 供 diffing 比對，原生文字改以 CSS visibility/transparent 隱藏，獨立疊加徽章層，並依 `grid.settings.indexHead` 嚴格限制欄位。
+- **純淨 TextNode 防污染守則 (Anti-Contamination-Text-Extraction)**：
+  在對 Virtual DOM 單元格進行 DOM Overlay 增強時，**嚴禁直接使用 `cellEl.textContent` 提取 JSON**！因為 `cellEl.textContent` 會將先前追加在單元格內的徽章 DOM 節點文字（如「緊急處理」）一併拼接到原生 JSON 字串後方，導致後續切換資料行時 `JSON.parse` 丟出語法例外，造成畫面上的彩色徽章永遠卡死在第一次渲染的舊標籤。必須透過遍歷 `cellEl.childNodes`，僅提取純粹的 TextNode (nodeType === 3)，徹底確保 JSON 解析零污染。
 - **Grid DOM 防裁切原則**：
   主網格（HyperGrid）搜尋列具備虛擬滾動與重繪機制，浮層（Popover/Modal）必須掛載於 `document.body`，採用 `position: fixed` + `z-index: 999999`，動態計算座標。
 - **三重容錯欄位偵測**：

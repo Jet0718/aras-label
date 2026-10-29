@@ -1,15 +1,32 @@
 /**
  * @file GridVirtualDomSafety.test.js
- * @description 驗證 Aras Innovator HyperGrid (Inferno.js) Virtual DOM 零破壞安全渲染與防欄位錯位邏輯
+ * @description 驗證 Aras Innovator HyperGrid (Inferno.js) Virtual DOM 零破壞安全渲染與純淨 TextNode 防污染邏輯
  */
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert");
 
 describe("Grid Virtual DOM Safety & Anti-Misplacement Tests", () => {
-  // 模擬安全單元格格式化邏輯 (與 bcs_main_grid_extension.js 核心演算法完全一致)
-  function simulateSafeFormat(cellEl, isLabelsColumn, jsonText) {
-    // 1. 若非標籤欄位 (例如 State)，立即移除殘留增強層並還原
+  // 提取純淨原生文字 (與 bcs_main_grid_extension.js 的 extractRawJsonText 一致)
+  function extractRawJsonText(cellEl) {
+    if (!cellEl) return "";
+    let raw = "";
+    const children = cellEl.childNodes || cellEl.children || [];
+    for (let i = 0; i < children.length; i++) {
+      const node = children[i];
+      if (node.nodeType === 3 || node.type === "text") {
+        raw += node.nodeValue || node.value || "";
+      } else if (node.nodeType === 1 || node.className) {
+        if (!node.className.includes("bcs-grid-tags-cell") && !node.className.includes("bcs-grid-tag-badge")) {
+          raw += node.textContent || node.value || "";
+        }
+      }
+    }
+    return raw.trim();
+  }
+
+  // 模擬安全單元格格式化邏輯
+  function simulateSafeFormat(cellEl, isLabelsColumn) {
     if (!isLabelsColumn) {
       const existing = cellEl.querySelector(".bcs-grid-tags-cell");
       if (existing) existing.remove();
@@ -17,20 +34,21 @@ describe("Grid Virtual DOM Safety & Anti-Misplacement Tests", () => {
       return;
     }
 
-    if (!jsonText || !jsonText.startsWith("[") || !jsonText.includes('"name":')) {
+    const text = extractRawJsonText(cellEl);
+    if (!text.startsWith("[") || !text.includes('"name":')) {
       const existing = cellEl.querySelector(".bcs-grid-tags-cell");
       if (existing) existing.remove();
       cellEl.classList.remove("bcs-labels-cell-active");
       return;
     }
 
-    // 2. 零破壞渲染：不清空 cellEl 原生子節點
     cellEl.classList.add("bcs-labels-cell-active");
     let container = cellEl.querySelector(".bcs-grid-tags-cell");
     if (!container) {
       container = {
         className: "bcs-grid-tags-cell",
         children: [],
+        dataset: {},
         remove() {
           const idx = cellEl.children.indexOf(this);
           if (idx >= 0) cellEl.children.splice(idx, 1);
@@ -39,16 +57,19 @@ describe("Grid Virtual DOM Safety & Anti-Misplacement Tests", () => {
       cellEl.children.push(container);
     }
 
-    // 渲染徽章
-    const tags = JSON.parse(jsonText);
+    const tags = JSON.parse(text);
+    const currentKeys = tags.map((t) => t.name).join(",");
+    if (container.dataset.bcsTagsKey === currentKeys) {
+      return;
+    }
+    container.dataset.bcsTagsKey = currentKeys;
     container.children = tags.map((t) => ({ name: t.name, label: t.label, color: t.color }));
   }
 
   it("防錯位驗證：當單元格非 labels 欄位時 (如 State)，絕不可被彩化，且應清理殘留徽章", () => {
-    // 模擬一個被 Virtual DOM 複用分配給 State 欄位的單元格
     const mockCell = {
       children: [
-        { type: "text", value: "Preliminary" } // 原生 State 文字節點
+        { type: "text", value: "Preliminary" }
       ],
       classList: {
         classes: new Set(),
@@ -64,7 +85,6 @@ describe("Grid Virtual DOM Safety & Anti-Misplacement Tests", () => {
       }
     };
 
-    // 模擬先前殘留了 labels 徽章
     const residualBadge = {
       className: "bcs-grid-tags-cell",
       children: [{ name: "urgent", label: "緊急處理" }],
@@ -76,19 +96,25 @@ describe("Grid Virtual DOM Safety & Anti-Misplacement Tests", () => {
     mockCell.children.push(residualBadge);
     mockCell.classList.add("bcs-labels-cell-active");
 
-    // 執行防護渲染：指定 isLabelsColumn = false (因為當前是 State 欄位)
-    simulateSafeFormat(mockCell, false, '[{"name":"urgent","label":"緊急處理"}]');
+    simulateSafeFormat(mockCell, false);
 
-    // 驗證：殘留徽章必須被移除，單元格不得帶有 active class，原生 State 文字節點完好無損
     assert.strictEqual(mockCell.querySelector(".bcs-grid-tags-cell"), null, "State 欄位中的殘留徽章必須被安全移除");
     assert.strictEqual(mockCell.classList.contains("bcs-labels-cell-active"), false, "State 欄位不得被標記為標籤激活狀態");
     assert.strictEqual(mockCell.children[0].value, "Preliminary", "原生文字節點 Preliminary 必須完好保留");
   });
 
-  it("零破壞驗證：當單元格確為 labels 欄位時，原生文字節點不應被拔除，徽章作為安全層追加", () => {
-    const originalTextNode = { type: "text", value: '[{"name":"vip","label":"VIP重點"}]' };
-    const mockCell = {
-      children: [originalTextNode],
+  it("反覆搜尋切換驗證：從 AM-1 (緊急處理) 切換至 AM-3 (VIP重點) 時，標籤必須即時精確更新為 VIP重點", () => {
+    // 1. 初始狀態：渲染 AM-1 (緊急處理, 設計審查)
+    const textNode = {
+      type: "text",
+      value: JSON.stringify([
+        { name: "urgent", label: "緊急處理", color: "#EF4444" },
+        { name: "design", label: "設計審查", color: "#3B82F6" }
+      ])
+    };
+
+    const cell = {
+      children: [textNode],
       classList: {
         classes: new Set(),
         add(c) { this.classes.add(c); },
@@ -103,14 +129,26 @@ describe("Grid Virtual DOM Safety & Anti-Misplacement Tests", () => {
       }
     };
 
-    simulateSafeFormat(mockCell, true, originalTextNode.value);
+    // 第一次渲染
+    simulateSafeFormat(cell, true);
+    let container = cell.querySelector(".bcs-grid-tags-cell");
+    assert.strictEqual(container.children.length, 2);
+    assert.strictEqual(container.children[0].label, "緊急處理");
+    assert.strictEqual(container.children[1].label, "設計審查");
 
-    // 驗證：原生 text node 依然在第 0 個位置 (Inferno insertBefore 永遠找得到此節點)
-    assert.strictEqual(mockCell.children[0], originalTextNode, "原生 TextNode 必須持續保留於 DOM 樹內");
-    // 追加了徽章層
-    const badgeContainer = mockCell.querySelector(".bcs-grid-tags-cell");
-    assert.notStrictEqual(badgeContainer, null, "必須追加獨立徽章層");
-    assert.strictEqual(badgeContainer.children[0].label, "VIP重點");
-    assert.strictEqual(mockCell.classList.contains("bcs-labels-cell-active"), true);
+    // 2. 使用者切換條件搜尋「VIP重點」，Virtual DOM 將單元格 TextNode 更新為 AM-3
+    textNode.value = JSON.stringify([
+      { name: "vip", label: "VIP重點", color: "#8B5CF6" }
+    ]);
+
+    // 第二次渲染：此時單元格內已帶有 container (先前殘留緊急處理)
+    simulateSafeFormat(cell, true);
+
+    // 驗證：container 必須成功重繪，且標籤必須為 VIP重點！絕不卡死在「緊急處理/設計審查」！
+    container = cell.querySelector(".bcs-grid-tags-cell");
+    assert.strictEqual(container.children.length, 1, "徽章數量必須更新為 1 個");
+    assert.strictEqual(container.children[0].name, "vip", "標籤代碼必須為 vip");
+    assert.strictEqual(container.children[0].label, "VIP重點", "標籤顯示文字必須為 VIP重點");
+    assert.strictEqual(container.dataset.bcsTagsKey, "vip", "快取鍵值必須更新為 vip");
   });
 });
