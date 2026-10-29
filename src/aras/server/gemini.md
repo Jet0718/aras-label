@@ -21,3 +21,7 @@
    - 使用者輸入之標籤文字必須進行單引號字元轉義處理 (`Replace("'", "''")`)，防止 AML / SQL 注入風險。
 3. **中文註解要求**：
    - 每個關鍵變數、邏輯區塊與例外處理區塊均需具備詳盡之中文註解說明。
+4. **AML 結構與權限避坑守則**：
+   - 嚴禁自訂非 32 碼 Hex ID。
+   - `RelationshipType` 必須嵌套建立關聯 ItemType。
+   - 必須宣告 `Allowed Permission` (`is_default=1`) 與 `ItemType Can Add`。

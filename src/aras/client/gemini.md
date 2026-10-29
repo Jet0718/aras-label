@@ -24,3 +24,6 @@
 2. **多語系支持**：所有標籤與 UI 文字皆需相容繁體中文 (`zh-TW`)、簡體中文 (`zh-CN`) 與英文 (`en`)，支援 Fallback 機制。
 3. **函式與註解規範**：所有類別與函式均需提供中文註解，詳細說明參數 (Param)、回傳值 (Return) 與異常處理。
 4. **單元測試與驗證**：核心組件需具備 Jest / Mocha 單元測試覆蓋，上線前執行瀏覽器端 E2E 模擬測試。
+5. **Monaco Linter 避坑守則**：
+   - 參數一律設置安全預設值（如 `targetDoc = null`），避免觸發 `implicitly has an 'any' type`。
+   - 嚴禁在純 JS 中撰寫 TypeScript 語法，禁止在 JSDoc 中使用 `{Type}` 花括號，改用標準中文行註解，避免觸發 `JSDoc types may be moved to TypeScript types (TS80001)` 提示。
