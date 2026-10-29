@@ -90,6 +90,15 @@
   string safeTerm = term.Replace("'", "''");
   ```
 
+### 4. 嚴禁在 IOM 查詢中對多語系 (ml_string) 欄位使用原生 SQL WHERE 屬性
+- **問題現象**：
+  使用 `tagQuery.setAttribute("where", $"[bcs_label_tags].label LIKE N'%{term}%'")` 查詢標籤目錄時，SQL Server 報錯 `Invalid column name 'label'`，或被 Aras 忽略導致取回錯誤標籤（例如搜「VIP重點」卻永遠被改寫為第一筆「緊急處理」）。
+- **根本原因**：
+  `ml_string` 欄位在 SQL Server 主表中不存在實體 column，而是存於多語系副表。直接寫 SQL `where` 會導致語法崩潰。
+- **標準解法**：
+  標籤目錄數量有限（通常幾十筆內），**一律一次性取得全數項目 (`select="name,label"`)，在 C# 記憶體中做大小寫無關 (`OrdinalIgnoreCase`) 之精準比對**，絕不依賴脆弱的 SQL `where` 屬性。
+
+
 ---
 
 ## 三、 AML 模型結構與資料匯入 (Schema & Data)

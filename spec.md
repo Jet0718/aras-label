@@ -580,9 +580,11 @@ function attachLabelSearchPopover(targetDocument: Document): void {
       <labels condition="like">%"name":"vip"%</labels>
     </and>
   </Item>
-  ```
+- **標籤目錄高精度解析演算法 (In-Memory Tag Catalog Match)**：
+  - 考量 `bcs_label_tags.label` 為多語系欄位 (`ml_string`)，嚴禁於 AML `where` 屬性中硬寫 SQL 表名與欄位比對（避免引發 SQL Server 無效欄位錯誤）。
+  - 改採一次取回 `bcs_label_tags` 全數標籤清單，於記憶體中進行大小寫無關 (OrdinalIgnoreCase) 之 `name` 代碼、預設 `label` 與多語系文字高精度精準比對。
+  - **多重 LIKE 容錯**：產生的查詢條件同時支援代碼匹配與文字模糊匹配（例如 `labels LIKE '%"name":"vip"%' OR labels LIKE '%VIP重點%'`），確保歷史資料與新資料 100% 準確命中。
 
-### 7.2 C# Server Method 撰寫與編譯規範
 - **Aras Innovator Method Wrapper 機制**：
   Aras Innovator 伺服器在編譯 C# Method 時，會將 Method 編輯器中的程式碼自動封裝於 `ItemMethod.methodCode()` 內部執行。
 - **程式碼撰寫規範**：

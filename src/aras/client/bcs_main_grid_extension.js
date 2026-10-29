@@ -512,23 +512,54 @@
         }
 
         const criteriaText = chosenLabels.join(matchMode === "OR" ? " | " : ", ");
+        
+        // 完整事件鏈：確保 Aras Grid 內部 criteria 模型 100% 接收到最新值
+        try {
+          currentBoundInput.focus();
+        } catch (errFocus) {}
         currentBoundInput.value = criteriaText;
         currentBoundInput.dispatchEvent(new Event("input", { bubbles: true }));
         currentBoundInput.dispatchEvent(new Event("change", { bubbles: true }));
+        currentBoundInput.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13, which: 13 }));
+        currentBoundInput.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13, which: 13 }));
+        try {
+          currentBoundInput.blur();
+        } catch (errBlur) {}
+
         closePopover();
 
-        // 自動觸發 Aras 主搜尋工具列的 Search 按鈕
+        // 跨 Frame 自動尋找並觸發 Aras 主搜尋指令
         setTimeout(() => {
-          const searchBtn = doc.querySelector(".aras-button[data-id='search'], button[title='Search'], button[aria-label='Search']");
-          if (searchBtn && typeof searchBtn.click === "function") {
-            searchBtn.click();
-          } else {
-            const win = doc.defaultView || window;
-            if (win && typeof win.onSearchCommand === "function") {
-              win.onSearchCommand();
-            }
+          const candidateWins = [
+            doc.defaultView || window,
+            window,
+            window.parent,
+            window.top
+          ];
+
+          let searchTriggered = false;
+          for (let wIdx = 0; wIdx < candidateWins.length; wIdx++) {
+            const w = candidateWins[wIdx];
+            if (!w) continue;
+            try {
+              if (typeof w.onSearchCommand === "function") {
+                w.onSearchCommand();
+                searchTriggered = true;
+                break;
+              }
+              if (w.document) {
+                const searchBtn = w.document.querySelector(
+                  ".aras-button[data-id='search'], button[data-id='search'], button[title='Search'], button[aria-label='Search']"
+                );
+                if (searchBtn && typeof searchBtn.click === "function") {
+                  searchBtn.click();
+                  searchTriggered = true;
+                  break;
+                }
+              }
+            } catch (errWinSearch) {}
           }
-        }, 80);
+        }, 100);
       };
     }
 

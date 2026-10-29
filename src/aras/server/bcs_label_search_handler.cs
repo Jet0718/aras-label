@@ -5,9 +5,9 @@
 // 語法規範: 符合 Aras Innovator Method Wrapper 機制
 //           (直接作為方法體編譯，無需 namespace、using 與 class 外層宣告)
 // 運作邏輯:
-//   1. 攔截查詢請求中針對 labels 欄位的搜尋條件 (例如 "*緊急處理*" 或 "*urgent,vip*")。
-//   2. 透過 IOM 查詢 bcs_label_tags，將使用者輸入的中文/多語系標籤轉換為標準鍵值 Key (name)。
-//   3. 重寫查詢條件為符合 AND 邏輯的高效 JSON 子字串模糊匹配 (%"name":"urgent"%)。
+//   1. 攔截查詢請求中針對 labels 欄位的搜尋條件 (例如 "*VIP重點*" 或 "*緊急處理,設計審查*")。
+//   2. 透過安全記憶體快取查詢 bcs_label_tags 目錄，高精度比對標籤 name 與 label。
+//   3. 重寫查詢條件為兼具唯一 Key 與多語系標籤的多重模糊匹配 (AND 邏輯)，確保精確命中。
 // =====================================================================
 
 Innovator inn = this.getInnovator();
@@ -20,10 +20,10 @@ try
     string rawCriteria = this.getProperty(targetPropertyName, string.Empty);
     if (string.IsNullOrWhiteSpace(rawCriteria))
     {
-        return this; // 無標籤查詢條件，直接放行
+        return this; // 無標籤查詢條件，直接放行原生查詢
     }
 
-    // 1. 解析使用者輸入之多個標籤關鍵字 (支援逗號或分號分隔，去除頭尾萬用字元)
+    // 1. 解析使用者輸入之標籤關鍵字 (去除頭尾萬用字元 * 與 %，依逗號或分號切分)
     string clean = rawCriteria.Trim().Trim('*', '%', ' ');
     char[] splitSeparators = new char[] { ',', ';', '，', '；' };
     string[] rawParts = clean.Split(splitSeparators, StringSplitOptions.RemoveEmptyEntries);
@@ -43,71 +43,146 @@ try
         return this;
     }
 
-    // 2. 查詢 bcs_label_tags 目錄，比對 name 或各語系 label，對齊標籤唯一鍵值 (name)
-    List<string> resolvedTagKeys = new List<string>();
+    // 2. 一次性安全讀取 bcs_label_tags 目錄中所有標籤 (記憶體比對，避開 SQL 表名與多語系欄位問題)
+    Item catalogQuery = inn.newItem(tagItemType, "get");
+    catalogQuery.setAttribute("select", "name,label");
+    Item catalogResult = catalogQuery.apply();
 
-    foreach (string term in searchTerms)
+    List<Tuple<string, string>> availableCatalogTags = new List<Tuple<string, string>>();
+    if (!catalogResult.isError() && catalogResult.getItemCount() > 0)
     {
-        // 簡易過濾單引號防範 AML/SQL 注入
-        string safeTerm = term.Replace("'", "''");
-
-        Item tagQuery = inn.newItem(tagItemType, "get");
-        tagQuery.setAttribute("select", "name,label");
-        tagQuery.setAttribute("where", $"[bcs_label_tags].name = '{safeTerm}' OR [bcs_label_tags].label LIKE N'%{safeTerm}%'");
-
-        Item result = tagQuery.apply();
-        if (!result.isError() && result.getItemCount() > 0)
+        for (int i = 0; i < catalogResult.getItemCount(); i++)
         {
-            for (int i = 0; i < result.getItemCount(); i++)
+            Item t = catalogResult.getItemByIndex(i);
+            string n = t.getProperty("name", string.Empty);
+            string l = t.getProperty("label", string.Empty);
+            if (!string.IsNullOrEmpty(n))
             {
-                Item tag = result.getItemByIndex(i);
-                string key = tag.getProperty("name", string.Empty);
-                if (!string.IsNullOrEmpty(key) && !resolvedTagKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
-                {
-                    resolvedTagKeys.Add(key);
-                }
-            }
-        }
-        else
-        {
-            // 若在標籤目錄查無完全匹配定義，直接以使用者輸入字串作為 key 比對
-            if (!resolvedTagKeys.Contains(term, StringComparer.OrdinalIgnoreCase))
-            {
-                resolvedTagKeys.Add(term);
+                availableCatalogTags.Add(new Tuple<string, string>(n, l));
             }
         }
     }
 
-    if (resolvedTagKeys.Count == 0)
+    // 3. 高精度對齊標籤鍵值 (Key) 與顯示文字 (Label)
+    List<string> resolvedKeys = new List<string>();
+    List<string> resolvedLabels = new List<string>();
+
+    foreach (string term in searchTerms)
+    {
+        bool matched = false;
+        // 先嘗試精確比對目錄中的 name 或 label (大小寫無關)
+        foreach (var catTag in availableCatalogTags)
+        {
+            if (string.Equals(catTag.Item1, term, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(catTag.Item2, term, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!resolvedKeys.Contains(catTag.Item1, StringComparer.OrdinalIgnoreCase))
+                {
+                    resolvedKeys.Add(catTag.Item1);
+                    resolvedLabels.Add(!string.IsNullOrEmpty(catTag.Item2) ? catTag.Item2 : catTag.Item1);
+                }
+                matched = true;
+                break;
+            }
+        }
+
+        // 若無完全相符，嘗試部分包含比對
+        if (!matched)
+        {
+            foreach (var catTag in availableCatalogTags)
+            {
+                if ((!string.IsNullOrEmpty(catTag.Item2) && catTag.Item2.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    catTag.Item1.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    if (!resolvedKeys.Contains(catTag.Item1, StringComparer.OrdinalIgnoreCase))
+                    {
+                        resolvedKeys.Add(catTag.Item1);
+                        resolvedLabels.Add(!string.IsNullOrEmpty(catTag.Item2) ? catTag.Item2 : catTag.Item1);
+                    }
+                    matched = true;
+                    break;
+                }
+            }
+        }
+
+        // 若仍未在目錄找到，直接以使用者輸入字串作為比對依據
+        if (!matched && !resolvedKeys.Contains(term, StringComparer.OrdinalIgnoreCase))
+        {
+            resolvedKeys.Add(term);
+            resolvedLabels.Add(term);
+        }
+    }
+
+    if (resolvedKeys.Count == 0)
     {
         return this;
     }
 
-    // 3. 移除原本單一的 labels 條件
+    // 4. 移除原本單一的 labels 條件
     this.removeProperty(targetPropertyName);
 
-    if (resolvedTagKeys.Count == 1)
+    // 5. 動態構建安全且精確的 AML 查詢條件 (多標籤預設 AND 交集，內部雙保險 LIKE 比對)
+    System.Xml.XmlDocument doc = this.node.OwnerDocument;
+
+    if (resolvedKeys.Count == 1)
     {
-        // 單一條件：%"name":"urgent"%
-        this.setProperty(targetPropertyName, $"%\"name\":\"{resolvedTagKeys[0]}\"%");
-        this.setPropertyAttribute(targetPropertyName, "condition", "like");
+        string key = resolvedKeys[0];
+        string lbl = resolvedLabels[0];
+
+        if (string.Equals(key, lbl, StringComparison.OrdinalIgnoreCase))
+        {
+            this.setProperty(targetPropertyName, $"%\"{key}\"%");
+            this.setPropertyAttribute(targetPropertyName, "condition", "like");
+        }
+        else
+        {
+            System.Xml.XmlElement orBlock = doc.CreateElement("or");
+
+            System.Xml.XmlElement condKey = doc.CreateElement(targetPropertyName);
+            condKey.SetAttribute("condition", "like");
+            condKey.InnerText = $"%\"name\":\"{key}\"%";
+            orBlock.AppendChild(condKey);
+
+            System.Xml.XmlElement condLbl = doc.CreateElement(targetPropertyName);
+            condLbl.SetAttribute("condition", "like");
+            condLbl.InnerText = $"%{lbl}%";
+            orBlock.AppendChild(condLbl);
+
+            this.node.AppendChild(orBlock);
+        }
     }
     else
     {
-        // 多標籤 AND 條件：透過 AML 的 <and> 區塊展開
-        // <and>
-        //   <labels condition="like">%"name":"urgent"%</labels>
-        //   <labels condition="like">%"name":"vip"%</labels>
-        // </and>
-        System.Xml.XmlDocument doc = this.node.OwnerDocument;
         System.Xml.XmlElement andBlock = doc.CreateElement("and");
 
-        foreach (string key in resolvedTagKeys)
+        for (int i = 0; i < resolvedKeys.Count; i++)
         {
-            System.Xml.XmlElement condElem = doc.CreateElement(targetPropertyName);
-            condElem.SetAttribute("condition", "like");
-            condElem.InnerText = $"%\"name\":\"{key}\"%";
-            andBlock.AppendChild(condElem);
+            string key = resolvedKeys[i];
+            string lbl = resolvedLabels[i];
+
+            if (string.Equals(key, lbl, StringComparison.OrdinalIgnoreCase))
+            {
+                System.Xml.XmlElement condElem = doc.CreateElement(targetPropertyName);
+                condElem.SetAttribute("condition", "like");
+                condElem.InnerText = $"%\"{key}\"%";
+                andBlock.AppendChild(condElem);
+            }
+            else
+            {
+                System.Xml.XmlElement orBlock = doc.CreateElement("or");
+
+                System.Xml.XmlElement condKey = doc.CreateElement(targetPropertyName);
+                condKey.SetAttribute("condition", "like");
+                condKey.InnerText = $"%\"name\":\"{key}\"%";
+                orBlock.AppendChild(condKey);
+
+                System.Xml.XmlElement condLbl = doc.CreateElement(targetPropertyName);
+                condLbl.SetAttribute("condition", "like");
+                condLbl.InnerText = $"%{lbl}%";
+                orBlock.AppendChild(condLbl);
+
+                andBlock.AppendChild(orBlock);
+            }
         }
 
         this.node.AppendChild(andBlock);
