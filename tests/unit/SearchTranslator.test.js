@@ -76,4 +76,26 @@ describe("SearchCriteriaTranslator Tests", () => {
     assert.strictEqual(SearchCriteriaTranslator.matchesRecord(recordJson, ["Urgent"]), true);
     assert.strictEqual(SearchCriteriaTranslator.matchesRecord(recordJson, ["Urgent Action"]), true);
   });
+
+  it("防誤查驗證：搜尋「VIP重點」時，僅含有「緊急處理/設計審查」之紀錄絕不命中", () => {
+    // 模擬 AM-1 (緊急處理 + 設計審查)
+    const am1Json = JSON.stringify([
+      { name: "urgent", label: "緊急處理", labels: { "zh-TW": "緊急處理", "en": "Urgent Action" }, color: "#EF4444" },
+      { name: "design", label: "設計審查", labels: { "zh-TW": "設計審查", "en": "Design Review" }, color: "#3B82F6" }
+    ]);
+    // 模擬 AM-7 (僅有 緊急處理)
+    const am7Json = JSON.stringify([
+      { name: "urgent", label: "緊急處理", labels: { "zh-TW": "緊急處理", "en": "Urgent Action" }, color: "#EF4444" }
+    ]);
+    // 模擬 AM-3 (含有 VIP重點)
+    const am3Json = JSON.stringify([
+      { name: "vip", label: "VIP重點", labels: { "zh-TW": "VIP重點", "en": "VIP Focus" }, color: "#8B5CF6" }
+    ]);
+
+    // 搜尋 VIP重點
+    const searchTerms = ["VIP重點"];
+    assert.strictEqual(SearchCriteriaTranslator.matchesRecord(am1Json, searchTerms), false, "AM-1 不應命中 VIP重點");
+    assert.strictEqual(SearchCriteriaTranslator.matchesRecord(am7Json, searchTerms), false, "AM-7 不應命中 VIP重點");
+    assert.strictEqual(SearchCriteriaTranslator.matchesRecord(am3Json, searchTerms), true, "AM-3 必須正確命中 VIP重點");
+  });
 });

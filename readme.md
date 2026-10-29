@@ -173,20 +173,22 @@
 3. 儲存並解鎖 Form。
 
 ### 步驟 5：設定後端 Multi-Tags 模糊搜尋轉譯器 (Server Method - onBeforeGet)
-1. **建立 Server Method (`bcs_label_search_handler`)**：
-   - 進入 **Administration > Methods**，新增 Method：
+1. **建立 / 更新 Server Method (`bcs_label_search_handler`)**：
+   - 進入 **Administration > Methods**，搜尋或新增 Method：
      - **Name**: `bcs_label_search_handler`
      - **Method Type**: `C#`
-     - **Code**: 複製 `src/aras/server/bcs_label_search_handler.cs` 的程式碼並儲存。
+     - **Code**: 複製 `src/aras/server/bcs_label_search_handler.cs` 的最新程式碼並儲存（具備全語系標籤目錄讀取、雙重安全補查與代碼精準模糊匹配）。
 2. **在目標 ItemType 掛載 Server Event**：
    - 開啟目標 ItemType（如 `Part`）。
-   - 切換至 **Server Events** 頁籤，新增事件關聯：
+   - 切換至 **Server Events** 頁籤，確認或新增事件關聯：
      - **Event**: `onBeforeGet`
      - **Related Method**: 選擇 `bcs_label_search_handler`
    - 儲存 ItemType。
+> [!IMPORTANT]
+> **搜尋結果校驗注意**：若搜尋框已顯示標籤，但搜尋結果仍查出其他不符合標籤的項目，請務必確認已將最新的 `src/aras/server/bcs_label_search_handler.cs` 貼回 Aras 的 Method 中，且該 Method 已成功關聯至 Part 的 `onBeforeGet` 事件。
 
 ### 步驟 6：設定 Main Grid 彩色徽章渲染與搜尋列選擇器 (Client Method)
-解決 Main Search 網格中 JSON 原始內容不易閱讀、以及搜尋欄無法點擊挑選標籤的問題：
+解決 Main Search 網格中 JSON 原始內容不易閱讀、以及搜尋欄無法點擊挑選標籤的問題。最新版支援**四層深度模型同步 (Deep Query Sync)**，在點選標籤套用時直接注入 `currQryItem`、`searchContainer.searchMode` 與 `grid.head`，確保 Aras 查詢引擎 100% 收到最新條件：
 
 1. **建立 Client Method (`bcs_main_grid_extension`)**：
    - 進入 **Administration > Methods**，新增 Method：

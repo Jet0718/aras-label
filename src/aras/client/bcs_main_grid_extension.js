@@ -482,6 +482,69 @@
       popover.classList.add("is-open");
     }
 
+    // --------------------------------------------------------------------------
+    // 四層深度同步 Aras 搜尋查詢模型 (QryItem, SearchMode, GridHead)
+    // 參數: targetDoc (預設 null) - 目標 document 物件
+    // 參數: criteriaText (預設 "") - 搜尋條件字串 (例如 "VIP重點" 或 "")
+    // --------------------------------------------------------------------------
+    function syncArasQueryModel(targetDoc = null, criteriaText = "") {
+      const d = targetDoc || doc;
+      const candidateWins = [
+        d.defaultView || window,
+        window,
+        window.parent,
+        window.top
+      ];
+
+      for (let wIdx = 0; wIdx < candidateWins.length; wIdx++) {
+        const w = candidateWins[wIdx];
+        if (!w) continue;
+
+        try {
+          // 1. 同步 currQryItem (Aras 核心查詢物件)
+          const qry = w.currQryItem ||
+                      (w.searchContainer && w.searchContainer.currQryItem) ||
+                      (w.searchContainer && w.searchContainer.searchMode && w.searchContainer.searchMode.currQryItem);
+          if (qry && typeof qry.setProperty === "function") {
+            if (criteriaText) {
+              qry.setProperty("labels", "*" + criteriaText + "*");
+              if (typeof qry.setPropertyAttribute === "function") {
+                qry.setPropertyAttribute("labels", "condition", "like");
+              }
+            } else {
+              if (typeof qry.removeProperty === "function") {
+                qry.removeProperty("labels");
+              }
+            }
+          }
+
+          // 2. 同步 searchContainer.searchMode 的 criteria
+          if (w.searchContainer && w.searchContainer.searchMode) {
+            const sm = w.searchContainer.searchMode;
+            if (typeof sm.setSearchCriteria === "function") {
+              try {
+                sm.setSearchCriteria("labels", criteriaText ? "*" + criteriaText + "*" : "");
+              } catch (errSm) {}
+            }
+          }
+
+          // 3. 同步 ArasModules.Grid / HyperGrid 的 head 定義
+          if (w.grid && w.grid.head) {
+            try {
+              for (const [headId, colDef] of w.grid.head.entries()) {
+                const colName = (colDef.name || colDef.field || "").toLowerCase();
+                const colLabel = (colDef.label || "").toLowerCase();
+                if (colName === "labels" || colLabel.includes("標記") || colLabel.includes("標籤")) {
+                  colDef.searchValue = criteriaText;
+                  break;
+                }
+              }
+            } catch (errHead) {}
+          }
+        } catch (errWinSync) {}
+      }
+    }
+
     // 清空操作
     if (clearBtn) {
       clearBtn.onclick = function (evt = null) {
@@ -493,6 +556,7 @@
           currentBoundInput.dispatchEvent(new Event("input", { bubbles: true }));
           currentBoundInput.dispatchEvent(new Event("change", { bubbles: true }));
         }
+        syncArasQueryModel(doc, "");
         closePopover();
       };
     }
@@ -513,7 +577,7 @@
 
         const criteriaText = chosenLabels.join(matchMode === "OR" ? " | " : ", ");
         
-        // 完整事件鏈：確保 Aras Grid 內部 criteria 模型 100% 接收到最新值
+        // 1. 第一層：DOM 賦值與完整原生事件鏈
         try {
           currentBoundInput.focus();
         } catch (errFocus) {}
@@ -526,9 +590,12 @@
           currentBoundInput.blur();
         } catch (errBlur) {}
 
+        // 2. 第二至四層：四層深度查詢模型同步 (currQryItem, searchMode, grid.head)
+        syncArasQueryModel(doc, criteriaText);
+
         closePopover();
 
-        // 跨 Frame 自動尋找並觸發 Aras 主搜尋指令
+        // 3. 跨 Frame 自動尋找並觸發 Aras 主搜尋指令
         setTimeout(() => {
           const candidateWins = [
             doc.defaultView || window,
@@ -542,6 +609,11 @@
             const w = candidateWins[wIdx];
             if (!w) continue;
             try {
+              if (w.searchContainer && typeof w.searchContainer.onSearch === "function") {
+                w.searchContainer.onSearch();
+                searchTriggered = true;
+                break;
+              }
               if (typeof w.onSearchCommand === "function") {
                 w.onSearchCommand();
                 searchTriggered = true;

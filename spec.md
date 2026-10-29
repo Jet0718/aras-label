@@ -318,6 +318,14 @@ class LabelTag {
 2. **屬性特徵比對**：檢查單元格之屬性（`data-index`, `data-key`, `data-head-id`）是否對齊 `labels`。
 3. **資料行特徵輔助**：若表頭結構受自訂樣式阻隔，透過掃描下方資料列單元格內容是否包含 `[{"name":` 特徵，反向鎖定所屬欄位之 Column Index，確保精準掛載。
 
+#### 4. 四層深度查詢模型同步 (Deep Query Sync Architecture)
+在 Aras Innovator 的主搜尋網格 (Main Search Grid) Simple Search 模式中，僅透過 JavaScript 修改 DOM `<input>.value` 並派發 synthetic DOM event，無法保證 Aras 內部查詢模型（`currQryItem` / `searchContainer` / `grid.head`）同步更新。若查詢模型未更新，Aras 送出的 AML 將仍停留在舊條件（或完全遺漏 `labels` 條件，退回全表查詢），導致搜尋框顯示正確但搜尋結果錯誤（例如顯示了前次搜尋包含「緊急處理」的項目）。
+為此，方案 A 實施四層深度同步：
+- **第一層 (DOM 層)**：賦值 `input.value = criteriaText` 並派發原生事件鏈 (`input`, `change`, `blur`)。
+- **第二層 (QryItem 核心層)**：跨視窗查找當前網格的 `currQryItem`（或 `searchContainer.searchMode.currQryItem`），直接呼叫 `setProperty("labels", "*" + criteriaText + "*")` 與 `setPropertyAttribute("labels", "condition", "like")`。清空時呼叫 `removeProperty("labels")`。
+- **第三層 (SearchMode 控制層)**：若 `searchContainer.searchMode` 具備 `setSearchCriteria` 介面，同步傳入最新條件。
+- **第四層 (Grid Head 快取層)**：若存在 `window.grid.head` (ArasModules.Grid / HyperGrid Map)，遍歷定位 `labels` 欄位定義，更新其 `searchValue` 屬性，杜絕虛擬滾動與重繪時被舊快取覆蓋。
+
 ---
 
 ## 6. Search 模組 Mermaid 圖表集
@@ -495,15 +503,18 @@ flowchart TD
     UserAction -- 點擊外部/按 Esc --> HidePopover[關閉浮層]
     
     UserAction -- 點擊套用搜尋 --> ApplyCriteria[組合條件字串: 標籤1, 標籤2]
-    ApplyCriteria --> DispatchEvents[派發 input 與 change 原生事件]
-    DispatchEvents --> TriggerArasSearch[觸發 Aras 主搜尋 (onSearchCommand)]
+    ApplyCriteria --> SyncDOM[1. 更新原生 input.value 與派發事件鏈]
+    SyncDOM --> SyncQryItem[2. 跨視窗注入 currQryItem.setProperty]
+    SyncQryItem --> SyncSearchMode[3. 呼叫 searchContainer.setSearchCriteria]
+    SyncSearchMode --> SyncGridHead[4. 更新 grid.head colDef.searchValue]
+    SyncGridHead --> TriggerArasSearch[觸發 Aras 主搜尋 (onSearchCommand)]
     TriggerArasSearch --> HidePopover
 ```
 
 ### 6.8 方案 A 前端核心虛擬碼 (Pseudocode)
 ```typescript
 /**
- * 方案 A 核心演算法虛擬碼
+ * 方案 A 核心演算法虛擬碼 (含四層深度同步)
  */
 function attachLabelSearchPopover(targetDocument: Document): void {
     // 1. 智慧探測標記欄位索引
@@ -526,15 +537,20 @@ function attachLabelSearchPopover(targetDocument: Document): void {
         openPopover(popover, searchInput);
     });
 
-    // 5. 套用搜尋回調
+    // 5. 套用搜尋回調 (四層深度同步)
     popover.onApply = (selectedTagKeys: string[], matchMode: "AND" | "OR") => {
         const displayLabels = selectedTagKeys.map(key => getTagDisplayLabel(key));
         const criteriaText = displayLabels.join(matchMode === "OR" ? " | " : ", ");
         
-        // 回寫並通知 Aras Grid 模型
+        // 第一層：DOM 賦值與事件派發
         searchInput.value = criteriaText;
         searchInput.dispatchEvent(new Event("input", { bubbles: true }));
         searchInput.dispatchEvent(new Event("change", { bubbles: true }));
+        searchInput.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 }));
+        
+        // 第二層至第四層：跨視窗深度模型同步 (QryItem, SearchMode, GridHead)
+        const win = targetDocument.defaultView || window;
+        syncArasQueryState(win, criteriaText);
         
         // 觸發 Aras 主搜尋
         triggerArasSearchCommand(targetDocument);
@@ -580,10 +596,10 @@ function attachLabelSearchPopover(targetDocument: Document): void {
       <labels condition="like">%"name":"vip"%</labels>
     </and>
   </Item>
-- **標籤目錄高精度解析演算法 (In-Memory Tag Catalog Match)**：
-  - 考量 `bcs_label_tags.label` 為多語系欄位 (`ml_string`)，嚴禁於 AML `where` 屬性中硬寫 SQL 表名與欄位比對（避免引發 SQL Server 無效欄位錯誤）。
-  - 改採一次取回 `bcs_label_tags` 全數標籤清單，於記憶體中進行大小寫無關 (OrdinalIgnoreCase) 之 `name` 代碼、預設 `label` 與多語系文字高精度精準比對。
-  - **多重 LIKE 容錯**：產生的查詢條件同時支援代碼匹配與文字模糊匹配（例如 `labels LIKE '%"name":"vip"%' OR labels LIKE '%VIP重點%'`），確保歷史資料與新資料 100% 準確命中。
+- **全語系雙重快取標籤目錄解析演算法 (Multilingual Tag Catalog Match)**：
+  - **語系中立全域加載**：查詢目錄時加入 `language="*"` 屬性，並遍歷 XML 子節點 `<label xml:lang="...">`，將所有語系文字（繁中、簡中、英文）均映射至對應的唯一標籤 Key（如 `vip`），避免因客戶端使用英文介面登入而比對失效。
+  - **雙重安全查詢 (Dual-Query Fallback)**：先嘗試以 `bcs_label_tags` 直接查詢；若因權限或關聯約束查無結果，立即自動切換至父表 `bcs_label ("Part_Labels")` 進行 Relationship 關聯補查。
+  - **精確代碼匹配防漏**：解析出鍵值後，一律轉譯為針對 JSON 結構之唯一代碼模糊匹配（`labels LIKE '%"name":"<key>"%'`），杜絕多重 `<or>` 結構引發 SQL Server 條件解析錯誤或空查詢誤傳。
 
 - **Aras Innovator Method Wrapper 機制**：
   Aras Innovator 伺服器在編譯 C# Method 時，會將 Method 編輯器中的程式碼自動封裝於 `ItemMethod.methodCode()` 內部執行。
